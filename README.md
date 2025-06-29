@@ -1,6 +1,6 @@
 # 🚀 Moodle Backup V3 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0-blue.svg)](https://github.com/tu-usuario/moodle-backup-v3)
+[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/tu-usuario/moodle-backup-v3)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
@@ -198,6 +198,65 @@ MAX_BACKUPS_GDRIVE=2
 # Configuración avanzada
 AUTO_DETECT_AGGRESSIVE="true"    # Auto-detección agresiva
 FORCE_THREADS=4                  # Número de hilos para compresión
+```
+
+### 🔐 Configuración Segura de Contraseñas
+
+El sistema ofrece **4 métodos** para configurar la contraseña de la base de datos, priorizando la seguridad:
+
+#### Método 1: Archivo Protegido (Recomendado)
+```bash
+# Crear archivo con permisos restrictivos
+sudo mkdir -p /etc/mysql
+sudo echo 'tu_password_aquí' > /etc/mysql/backup.pwd
+sudo chmod 600 /etc/mysql/backup.pwd
+sudo chown root:root /etc/mysql/backup.pwd
+```
+
+#### Método 2: Variable de Entorno
+```bash
+# Para sesión actual
+export MYSQL_PASSWORD='tu_password_aquí'
+
+# Para hacer permanente
+echo "export MYSQL_PASSWORD='tu_password_aquí'" >> ~/.bashrc
+```
+
+#### Método 3: En Archivo de Configuración (Desarrollo)
+```bash
+# En moodle_backup.conf (menos seguro)
+DB_PASS="tu_password_aquí"
+```
+
+#### ⚡ Configuración Automática
+
+Durante la instalación, el sistema te permite:
+- ✅ **Crear archivo protegido automáticamente** con permisos correctos
+- ✅ **Configurar variable de entorno** para la sesión actual
+- ✅ **Postponer configuración** con instrucciones detalladas
+- ✅ **Verificar estado** de todas las configuraciones
+
+```bash
+# El instalador detecta y configura automáticamente
+# Simplemente elige la opción más segura para tu entorno
+```
+
+### 📋 Orden de Prioridad de Contraseñas
+
+El script busca la contraseña en este orden:
+1. **Variable `DB_PASS`** en archivo de configuración
+2. **Variable de entorno `MYSQL_PASSWORD`**
+3. **Archivo `/etc/mysql/backup.pwd`**
+4. **Auto-detección** desde `config.php` de Moodle
+
+### 🔍 Verificar Configuración
+
+```bash
+# Verificar qué método está usando
+mb --test
+
+# Ver estado de configuración de contraseñas
+mb --show-config | grep -A 10 "CONTRASEÑA"
 OPTIMIZED_HOURS="02-08"          # Horas de menor carga
 ```
 
@@ -261,7 +320,7 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 Desarrollado por **Desarrollador** - Especialistas en infraestructura Moodle y hosting optimizado.
 
 - **Autor**: Desarrollador Team
-- **Versión**: 3.0
+- **Versión**: 3.0.1
 - **Última actualización**: 2025-06-29
 
 ---

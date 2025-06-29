@@ -465,9 +465,136 @@ manual_configuration_wizard() {
     echo -n "Usuario de la base de datos: "
     read -r db_user
     
-    echo -n "Contraseña de la base de datos (se guardará en texto plano): "
-    read -rs db_pass
+    # Información sobre configuración de contraseña de BD
     echo ""
+    echo "🔐 CONFIGURACIÓN DE CONTRASEÑA DE BASE DE DATOS"
+    echo "⚠️  IMPORTANTE: Configuración de seguridad para la contraseña"
+    echo ""
+    echo "Opciones disponibles para mayor seguridad:"
+    echo "1. Variable de entorno MYSQL_PASSWORD (más seguro)"
+    echo "2. Archivo protegido /etc/mysql/backup.pwd (recomendado)"
+    echo "3. Escribir en configuración (menos seguro)"
+    echo ""
+    echo "Si eliges opción 1 o 2, puedes dejar esto vacío y configurarlo después."
+    echo "Consulta la documentación para configuración avanzada."
+    echo ""
+    
+    local db_pass_choice=""
+    echo "¿Cómo prefieres configurar la contraseña?"
+    echo "1. Escribir ahora (texto plano en archivo config - menos seguro)"
+    echo "2. Crear archivo protegido automáticamente (recomendado)"
+    echo "3. Variable de entorno (configurar manualmente después)"
+    echo "4. Configurar más tarde (solo instrucciones)"
+    echo -n "Selecciona opción (1-4) [2]: "
+    read -r db_pass_choice
+    db_pass_choice="${db_pass_choice:-2}"
+    
+    local db_pass=""
+    case "$db_pass_choice" in
+        "1")
+            echo ""
+            echo -n "Contraseña de la base de datos: "
+            read -rs db_pass
+            echo ""
+            echo "⚠️  La contraseña se guardará en texto plano en moodle_backup.conf"
+            ;;
+        "2")
+            echo ""
+            echo "✅ Configuración de archivo protegido seleccionada"
+            
+            if [[ $EUID -eq 0 ]] || sudo -n true 2>/dev/null; then
+                echo -n "Contraseña de la base de datos: "
+                read -rs temp_password
+                echo ""
+                
+                # Crear directorio si no existe
+                [[ $EUID -eq 0 ]] && mkdir -p /etc/mysql || sudo mkdir -p /etc/mysql
+                
+                # Escribir contraseña al archivo protegido
+                if [[ $EUID -eq 0 ]]; then
+                    echo "$temp_password" > /etc/mysql/backup.pwd
+                    chmod 600 /etc/mysql/backup.pwd
+                    chown root:root /etc/mysql/backup.pwd
+                else
+                    echo "$temp_password" | sudo tee /etc/mysql/backup.pwd > /dev/null
+                    sudo chmod 600 /etc/mysql/backup.pwd
+                    sudo chown root:root /etc/mysql/backup.pwd
+                fi
+                
+                print_success "✅ Archivo protegido creado: /etc/mysql/backup.pwd"
+                print_info "Permisos: 600 (solo root puede leer)"
+                
+                # Verificar que se creó correctamente
+                if [[ -f /etc/mysql/backup.pwd ]]; then
+                    local file_perms=$(stat -c "%a" /etc/mysql/backup.pwd 2>/dev/null || stat -f "%Mp%Lp" /etc/mysql/backup.pwd 2>/dev/null || echo "")
+                    if [[ "$file_perms" == "600" ]]; then
+                        print_success "✅ Permisos configurados correctamente"
+                    else
+                        print_warning "⚠️  Verificar permisos del archivo manualmente"
+                    fi
+                else
+                    print_error "❌ Error creando el archivo protegido"
+                    print_info "Deberá configurarlo manualmente después"
+                fi
+                
+                unset temp_password  # Limpiar variable de memoria
+                db_pass=""  # Dejar vacío en config para usar archivo
+            else
+                print_error "❌ Se necesitan permisos de administrador para crear archivo protegido"
+                print_info "📋 EJECUTA MANUALMENTE DESPUÉS DE LA INSTALACIÓN:"
+                echo "   sudo mkdir -p /etc/mysql"
+                echo "   sudo echo 'tu_password_aquí' > /etc/mysql/backup.pwd"
+                echo "   sudo chmod 600 /etc/mysql/backup.pwd"
+                echo "   sudo chown root:root /etc/mysql/backup.pwd"
+                db_pass=""
+            fi
+            ;;
+        "3")
+            echo ""
+            echo "✅ Configuración con variable de entorno seleccionada"
+            echo ""
+            echo "📋 CONFIGURACIÓN REQUERIDA:"
+            echo "   export MYSQL_PASSWORD='tu_password_aquí'"
+            echo ""
+            echo "💡 Para hacerlo permanente, agrega la línea a ~/.bashrc:"
+            echo "   echo \"export MYSQL_PASSWORD='tu_password'\" >> ~/.bashrc"
+            echo ""
+            
+            echo -n "¿Deseas configurar la variable ahora para esta sesión? [y/N]: "
+            read -r set_env_now
+            if [[ "$set_env_now" =~ ^[Yy]$ ]]; then
+                echo -n "Contraseña de la base de datos: "
+                read -rs temp_password
+                echo ""
+                export MYSQL_PASSWORD="$temp_password"
+                print_success "✅ Variable MYSQL_PASSWORD configurada para esta sesión"
+                print_warning "⚠️  Recuerda agregar la variable a ~/.bashrc para que persista"
+                unset temp_password
+            fi
+            db_pass=""
+            ;;
+        "4")
+            echo ""
+            echo "✅ Configuración postpone seleccionada"
+            echo "📋 OPCIONES DISPONIBLES PARA CONFIGURAR DESPUÉS:"
+            echo ""
+            echo "   Opción A - Archivo protegido (RECOMENDADO):"
+            echo "   sudo mkdir -p /etc/mysql"
+            echo "   sudo echo 'tu_password_aquí' > /etc/mysql/backup.pwd"
+            echo "   sudo chmod 600 /etc/mysql/backup.pwd"
+            echo "   sudo chown root:root /etc/mysql/backup.pwd"
+            echo ""
+            echo "   Opción B - Variable de entorno:"
+            echo "   export MYSQL_PASSWORD='tu_password_aquí'"
+            echo "   # Agregar a ~/.bashrc para persistir"
+            echo ""
+            db_pass=""
+            ;;
+        *)
+            print_error "Opción inválida, usando configuración postpone"
+            db_pass=""
+            ;;
+    esac
     
     # Solicitar email de notificación (OBLIGATORIO)
     echo ""
@@ -780,6 +907,80 @@ show_final_summary() {
     echo "  3. Revisar logs en: /var/log/moodle_backup*.log"
     echo "  4. Verificar tareas de cron: crontab -l"
     echo ""
+    
+    # Verificar estado de configuración de contraseñas y mostrar información relevante
+    local need_password_config=false
+    local has_protected_file=false
+    local has_env_var=false
+    local configs_with_plain_pass=()
+    
+    # Verificar archivo protegido
+    if [[ -f /etc/mysql/backup.pwd ]]; then
+        has_protected_file=true
+    fi
+    
+    # Verificar variable de entorno
+    if [[ -n "${MYSQL_PASSWORD:-}" ]]; then
+        has_env_var=true
+    fi
+    
+    # Verificar configuraciones
+    for config in "$FINAL_CONFIG_DIR"/moodle_backup*.conf; do
+        if [[ -f "$config" ]]; then
+            if grep -q "^DB_PASS=.\+$" "$config" 2>/dev/null; then
+                configs_with_plain_pass+=("$(basename "$config")")
+            elif ! grep -q "^DB_PASS=" "$config" 2>/dev/null; then
+                need_password_config=true
+            fi
+        fi
+    done
+    
+    # Mostrar estado de configuración de contraseñas
+    echo -e "${CYAN}🔐 ESTADO DE CONFIGURACIÓN DE CONTRASEÑAS:${NC}"
+    echo ""
+    
+    if [[ "$has_protected_file" == "true" ]]; then
+        echo -e "${GREEN}✅ Archivo protegido configurado: /etc/mysql/backup.pwd${NC}"
+        local file_perms=$(stat -c "%a" /etc/mysql/backup.pwd 2>/dev/null || echo "???")
+        echo -e "   Permisos: $file_perms $([ "$file_perms" = "600" ] && echo "✅" || echo "⚠️")"
+    fi
+    
+    if [[ "$has_env_var" == "true" ]]; then
+        echo -e "${GREEN}✅ Variable de entorno MYSQL_PASSWORD configurada${NC}"
+        echo -e "   (Solo para esta sesión - agregar a ~/.bashrc para persistir)"
+    fi
+    
+    if [[ ${#configs_with_plain_pass[@]} -gt 0 ]]; then
+        echo -e "${YELLOW}⚠️  Configuraciones con contraseña en texto plano:${NC}"
+        for config in "${configs_with_plain_pass[@]}"; do
+            echo -e "   • $config"
+        done
+        echo -e "${YELLOW}   Considera migrar a método más seguro${NC}"
+    fi
+    
+    if [[ "$need_password_config" == "true" ]]; then
+        echo -e "${YELLOW}🔐 RECORDATORIO IMPORTANTE - CONFIGURACIÓN DE CONTRASEÑA BD:${NC}"
+        echo ""
+        echo -e "${RED}⚠️  Algunas configuraciones requieren contraseña de base de datos${NC}"
+        echo ""
+        echo -e "${CYAN}Opciones de configuración segura:${NC}"
+        echo ""
+        echo -e "${GREEN}Opción 1 - Archivo protegido (RECOMENDADO):${NC}"
+        echo "  sudo echo 'tu_password_aquí' > /etc/mysql/backup.pwd"
+        echo "  sudo chmod 600 /etc/mysql/backup.pwd"
+        echo "  sudo chown root:root /etc/mysql/backup.pwd"
+        echo ""
+        echo -e "${GREEN}Opción 2 - Variable de entorno:${NC}"
+        echo "  export MYSQL_PASSWORD='tu_password_aquí'"
+        echo "  # Agregar a ~/.bashrc para persistir"
+        echo ""
+        echo -e "${GREEN}Opción 3 - En archivo de configuración:${NC}"
+        echo "  Editar archivos .conf y agregar: DB_PASS=tu_password"
+        echo "  (Menos seguro - solo para desarrollo)"
+        echo ""
+        echo -e "${CYAN}💡 Verificar después con: mb --test${NC}"
+        echo ""
+    fi
     
     if [[ "$INSTALL_MODE" == "user" ]]; then
         echo -e "${YELLOW}⚠️  Instalación de usuario:${NC}"
