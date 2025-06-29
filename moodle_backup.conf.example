@@ -97,11 +97,26 @@ DB_NAME=""
 DB_USER=""
 # Ejemplo: DB_USER=mi_usuario_db
 
-# Contraseña de BD - ORDEN DE BÚSQUEDA:
-# 1. Variable de entorno MYSQL_PASSWORD
-# 2. Archivo /etc/mysql/backup.pwd
-# 3. Esta variable (NO RECOMENDADO por seguridad)
+# ===================== CONFIGURACIÓN DE CONTRASEÑA DE BASE DE DATOS =====================
+# 🔐 CONFIGURACIÓN SEGURA DE CONTRASEÑA - ORDEN DE BÚSQUEDA:
+#
+# 1. Variable de entorno MYSQL_PASSWORD (MÁS SEGURO)
+#    export MYSQL_PASSWORD="tu_password_aquí"
+#
+# 2. Archivo protegido /etc/mysql/backup.pwd (RECOMENDADO)
+#    sudo echo "tu_password_aquí" > /etc/mysql/backup.pwd
+#    sudo chmod 600 /etc/mysql/backup.pwd
+#    sudo chown root:root /etc/mysql/backup.pwd
+#
+# 3. Esta variable DB_PASS (MENOS SEGURO - solo para desarrollo)
+#    ⚠️  NO recomendado para producción ya que queda en texto plano
+#
+# IMPORTANTE: Si usas opciones 1 o 2, deja comentada o vacía la línea DB_PASS
 # DB_PASS=mi_password_secreto
+
+# VERIFICAR CONFIGURACIÓN:
+# Después de configurar, ejecuta: ./moodle_backup.sh --test
+# para verificar que la conexión a la base de datos funcione correctamente.
 
 # ===================== CONFIGURACIÓN DE GOOGLE DRIVE =====================
 # Remote de rclone configurado para Google Drive

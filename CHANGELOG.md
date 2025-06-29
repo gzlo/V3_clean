@@ -5,6 +5,44 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.1] - 2025-06-29
+
+### 🔒 Seguridad y Configuración Mejorada
+
+#### ✨ Nuevas Funcionalidades
+- **Configuración de Contraseñas Inteligente**: Sistema avanzado de configuración de contraseñas de BD con múltiples opciones de seguridad
+- **Archivo Protegido Automático**: Creación automática de `/etc/mysql/backup.pwd` con permisos 600
+- **Variable de Entorno Interactiva**: Configuración automática de `MYSQL_PASSWORD` durante la instalación
+- **Verificación de Estado**: Detección inteligente del método de configuración utilizado en el resumen final
+
+#### 🛠️ Mejoras en el Instalador
+- **4 Opciones de Configuración**:
+  1. Texto plano en archivo config (menos seguro - para desarrollo)
+  2. Archivo protegido automático (recomendado)
+  3. Variable de entorno con configuración opcional inmediata
+  4. Configuración postpone con instrucciones detalladas
+- **Detección de Permisos**: Verificación automática de permisos sudo para crear archivos protegidos
+- **Fallback Inteligente**: Si no hay permisos, muestra instrucciones manuales claras
+- **Validación de Configuración**: Verifica permisos del archivo creado (600)
+
+#### 📋 Documentación Mejorada
+- **Instrucciones Claras**: Comandos específicos listos para copiar y pegar
+- **Priorización de Seguridad**: Destaca métodos más seguros con indicadores visuales
+- **Resumen Inteligente**: Detecta automáticamente qué configuraciones necesitan atención
+- **Estado de Contraseñas**: Muestra el estado actual de todas las configuraciones de BD
+
+#### 🎨 Experiencia de Usuario
+- **Indicadores Visuales**: Emojis y colores para destacar información importante
+- **Opciones por Defecto**: Opción segura (archivo protegido) como predeterminada
+- **Confirmación Visual**: Mensajes de éxito/error claros para cada operación
+- **Recordatorios Persistentes**: Información importante visible en múltiples lugares
+
+### 🔧 Mejoras Técnicas
+- **Limpieza de Memoria**: Variables temporales de contraseñas se limpian inmediatamente
+- **Verificación de Integridad**: Comprueba que los archivos se crearon con permisos correctos
+- **Compatibilidad Multiplataforma**: Comandos `stat` funcionan en diferentes sistemas
+- **Manejo de Errores Robusto**: Gestión granular de errores en cada opción
+
 ## [3.0.0] - 2025-01-29
 
 ### 🎉 Características Principales (Versión V3)
