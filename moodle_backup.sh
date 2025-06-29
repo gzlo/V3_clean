@@ -250,8 +250,8 @@ auto_detect_directories_cpanel() {
         local possible_www_dirs=(
             "/home/${user}/public_html"
             "/home/${user}/public_html/moodle"
-            "/home/${user}/public_html/academia"
             "/home/${user}/public_html/lms"
+            "/home/${user}/public_html/elearning"
             "/home/${user}/www"
         )
         
