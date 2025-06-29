@@ -33,30 +33,35 @@ curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/we
 ## 🎯 Características Principales
 
 ### ✨ **Auto-detección Inteligente**
+
 - **Paneles de Control**: cPanel, Plesk, DirectAdmin, VestaCP, ISPConfig, Manual
 - **Rutas de Moodle**: Detecta automáticamente www y moodledata
 - **Configuración de BD**: Lee config.php para obtener credenciales
 - **Sistema Operativo**: Soporta CentOS/RHEL, Ubuntu/Debian, Fedora, Rocky Linux
 
 ### 🚀 **Instalación Universal**
+
 - **Un comando**: Instalación completa desde GitHub
 - **Sin dependencias**: Instala automáticamente todo lo necesario
 - **Multi-entorno**: VPS, hosting compartido, servidores dedicados
 - **Verificación**: Comprueba la instalación y funcionalidad
 
 ### 🛡️ **Backup Inteligente**
+
 - **Compresión avanzada**: zstd para máxima eficiencia
 - **Multi-hilo**: Acelera significativamente el proceso
 - **Verificación**: Comprueba integridad de archivos y BD
 - **Limpieza automática**: Mantiene solo los backups necesarios
 
 ### ☁️ **Sincronización en la Nube**
+
 - **Google Drive**: Configuración automática con rclone
 - **Gestión inteligente**: Rotación automática de backups antiguos
 - **Verificación**: Comprueba subida y integridad
 - **Recuperación**: Descarga directa desde la nube
 
 ### 📊 **Monitoreo y Logging**
+
 - **Logs detallados**: Registro completo de todas las operaciones
 - **Notificaciones**: Email en caso de errores o éxito
 - **Diagnósticos**: Herramientas de análisis y troubleshooting
@@ -116,6 +121,7 @@ mb --config /etc/moodle_backup_cliente2.conf --test
 ### Problemas Comunes
 
 **Error: "mysql command not found"**
+
 ```bash
 # CentOS/RHEL/Fedora
 sudo yum install mysql -y
@@ -125,6 +131,7 @@ sudo apt-get install mysql-client -y
 ```
 
 **Error: "rclone not configured"**
+
 ```bash
 # Configurar Google Drive
 rclone config
@@ -132,6 +139,7 @@ rclone config
 ```
 
 **Error: "Permission denied"**
+
 ```bash
 # Verificar permisos de archivos
 ls -la /usr/local/bin/moodle_backup.sh
@@ -205,6 +213,7 @@ FORCE_THREADS=4                  # Número de hilos para compresión
 El sistema ofrece **4 métodos** para configurar la contraseña de la base de datos, priorizando la seguridad:
 
 #### Método 1: Archivo Protegido (Recomendado)
+
 ```bash
 # Crear archivo con permisos restrictivos
 sudo mkdir -p /etc/mysql
@@ -214,6 +223,7 @@ sudo chown root:root /etc/mysql/backup.pwd
 ```
 
 #### Método 2: Variable de Entorno
+
 ```bash
 # Para sesión actual
 export MYSQL_PASSWORD='tu_password_aquí'
@@ -223,6 +233,7 @@ echo "export MYSQL_PASSWORD='tu_password_aquí'" >> ~/.bashrc
 ```
 
 #### Método 3: En Archivo de Configuración (Desarrollo)
+
 ```bash
 # En moodle_backup.conf (menos seguro)
 DB_PASS="tu_password_aquí"
@@ -231,6 +242,7 @@ DB_PASS="tu_password_aquí"
 #### ⚡ Configuración Automática
 
 Durante la instalación, el sistema te permite:
+
 - ✅ **Crear archivo protegido automáticamente** con permisos correctos
 - ✅ **Configurar variable de entorno** para la sesión actual
 - ✅ **Postponer configuración** con instrucciones detalladas
@@ -244,6 +256,7 @@ Durante la instalación, el sistema te permite:
 ### 📋 Orden de Prioridad de Contraseñas
 
 El script busca la contraseña en este orden:
+
 1. **Variable `DB_PASS`** en archivo de configuración
 2. **Variable de entorno `MYSQL_PASSWORD`**
 3. **Archivo `/etc/mysql/backup.pwd`**
@@ -277,6 +290,7 @@ OPTIMIZED_HOURS="02-08"          # Horas de menor carga
 ## 🆕 Changelog V3
 
 ### ✨ Nuevas Características
+
 - **Instalador web**: Instalación directa desde GitHub con un comando
 - **Auto-detección mejorada**: Soporte para todos los paneles principales
 - **Multi-panel inteligente**: Configuración automática según el entorno
@@ -285,12 +299,14 @@ OPTIMIZED_HOURS="02-08"          # Horas de menor carga
 - **Gestión de dependencias**: Instalación automática de herramientas necesarias
 
 ### 🔧 Mejoras
+
 - **Logging mejorado**: Más detallado y estructurado
 - **Gestión de errores**: Mejor manejo y recuperación de errores
 - **Performance**: Optimizaciones en compresión y transferencia
 - **Compatibilidad**: Mejor soporte para diferentes distribuciones Linux
 
 ### 🐛 Correcciones
+
 - Problemas de detección en hosting compartido
 - Errores de permisos en instalaciones de usuario
 - Compatibilidad con versiones antiguas de MySQL
@@ -317,9 +333,9 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 🙏 Créditos
 
-Desarrollado por **Desarrollador** - Especialistas en infraestructura Moodle y hosting optimizado.
+Desarrollado por **gzlo** - Especialista en infraestructura Moodle y hosting optimizado.
 
-- **Autor**: Desarrollador Team
+- **Autor**: gzlo
 - **Versión**: 3.0.1
 - **Última actualización**: 2025-06-29
 
