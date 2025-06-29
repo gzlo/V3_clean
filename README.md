@@ -1,6 +1,6 @@
 # 🚀 Moodle Backup V3 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/tu-usuario/moodle-backup-v3)
+[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
@@ -11,23 +11,23 @@ Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección 
 
 ```bash
 # Instalación automática desde GitHub (recomendado)
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
 
 # O usando wget
-wget -qO- https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash
+wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
 ```
 
 ### 🔧 Instalación con Opciones
 
 ```bash
 # Instalación completamente automática (sin preguntas)
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --auto
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto
 
 # Instalación interactiva personalizada
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --interactive
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --interactive
 
 # Instalación omitiendo ciertas configuraciones
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
 ```
 
 ## 🎯 Características Principales
@@ -168,7 +168,7 @@ tail -f /var/log/moodle_backup*.log
 ## 📁 Estructura del Proyecto
 
 ```
-moodle-backup-v3/
+moodle-backup/
 ├── moodle_backup.sh              # Script principal
 ├── mb                             # Wrapper para comandos cortos
 ├── moodle_backup.conf.example     # Configuración de ejemplo
@@ -316,7 +316,7 @@ OPTIMIZED_HOURS="02-08"          # Horas de menor carga
 
 ### 🆘 Obtener Ayuda
 
-- **Issues**: [GitHub Issues](https://github.com/tu-usuario/moodle-backup-v3/issues)
+- **Issues**: [GitHub Issues](https://github.com/gzlo/moodle-backup/issues)
 - **Documentación**: Ver carpeta `docs/` para guías detalladas
 
 ### 🤝 Contribuir
@@ -343,4 +343,4 @@ Desarrollado por **gzlo** - Especialista en infraestructura Moodle y hosting opt
 
 ⭐ **¿Te resulta útil?** ¡Dale una estrella al repositorio y compártelo!
 
-📧 **¿Necesitas soporte?** Abre un [Issue en GitHub](https://github.com/tu-usuario/moodle-backup-v3/issues) o consulta la documentación.
+📧 **¿Necesitas soporte?** Abre un [Issue en GitHub](https://github.com/gzlo/moodle-backup/issues) o consulta la documentación.

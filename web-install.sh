@@ -6,12 +6,12 @@
 # Fecha: 2025-06-29
 #
 # USO DIRECTO DESDE GITHUB:
-#   curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash
-#   wget -qO- https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
 #
 # USO CON PARÁMETROS:
-#   curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --auto
-#   curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --interactive
+#   curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto
+#   curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --interactive
 #
 # CARACTERÍSTICAS:
 # - Instalación completamente automática desde GitHub
@@ -35,7 +35,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Variables del instalador
-REPO_BASE_URL="https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main"
+REPO_BASE_URL="https://raw.githubusercontent.com/gzlo/moodle-backup/main"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc"
 USER_INSTALL_DIR="$HOME/bin"
@@ -152,8 +152,8 @@ show_usage() {
     echo "  --help, -h      Mostrar esta ayuda"
     echo ""
     echo "EJEMPLOS:"
-    echo "  curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash"
-    echo "  curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/web-install.sh | bash -s -- --auto"
+    echo "  curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash"
+    echo "  curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto"
 }
 
 # Función para detectar el sistema operativo
@@ -750,9 +750,9 @@ show_final_summary() {
     fi
     
     echo -e "${CYAN}🆘 Soporte:${NC}"
-    echo "  • Documentación: https://github.com/tu-usuario/moodle-backup-v3"
-    echo "  • Issues: https://github.com/tu-usuario/moodle-backup-v3/issues"
-    echo "  • GitHub: https://github.com/tu-usuario/moodle-backup-v3"
+    echo "  • Documentación: https://github.com/gzlo/moodle-backup"
+    echo "  • Issues: https://github.com/gzlo/moodle-backup/issues"
+    echo "  • GitHub: https://github.com/gzlo/moodle-backup"
     echo ""
     
     print_success "¡Instalación completada exitosamente!"
