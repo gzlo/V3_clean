@@ -2,7 +2,7 @@
 # ===================== INSTALADOR INTERACTIVO MOODLE BACKUP V3 =====================
 # Instalador automático desde GitHub con configuración asistida
 # Autor: Sistema Moodle Backup
-# Ejecutar con: bash <(curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main/install-interactive.sh)
+# Ejecutar con: bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install-interactive.sh)
 # =====================================================================================
 
 set -euo pipefail
@@ -19,7 +19,7 @@ NC='\033[0m'
 BOLD='\033[1m'
 
 # Variables globales
-GITHUB_REPO="https://raw.githubusercontent.com/tu-usuario/moodle-backup-v3/main"
+GITHUB_REPO="https://raw.githubusercontent.com/gzlo/moodle-backup/main"
 INSTALL_DIR=""
 CONFIG_DIR=""
 SCRIPT_NAME="moodle-backup"
@@ -641,8 +641,8 @@ show_final_summary() {
     fi
     
     echo -e "${BLUE}📞 SOPORTE:${NC}"
-    echo -e "  GitHub: ${CYAN}https://github.com/tu-usuario/moodle-backup-v3${NC}"
-    echo -e "  GitHub: ${CYAN}https://github.com/tu-usuario/moodle-backup-v3${NC}"
+    echo -e "  GitHub: ${CYAN}https://github.com/gzlo/moodle-backup${NC}"
+    echo -e "  Issues: ${CYAN}https://github.com/gzlo/moodle-backup/issues${NC}"
     echo ""
     
     if ask_yes_no "¿Deseas ejecutar una prueba completa ahora?" "y"; then

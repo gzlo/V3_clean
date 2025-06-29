@@ -6,8 +6,8 @@
 # Fecha: 2025-06-29
 #
 # USO:
-#   curl -fsSL https://raw.githubusercontent.com/usuario/moodle-backup-v3/main/install.sh | bash
-#   wget -qO- https://raw.githubusercontent.com/usuario/moodle-backup-v3/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
+#   wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
 #
 # FUNCIONALIDADES:
 # - Detección automática del sistema operativo (CentOS/RHEL/Fedora vs Ubuntu/Debian)
@@ -30,7 +30,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Variables del instalador
-REPO_URL="https://raw.githubusercontent.com/usuario/moodle-backup-v3/main"
+REPO_URL="https://raw.githubusercontent.com/gzlo/moodle-backup/main"
 INSTALL_DIR="/usr/local/bin"
 CONFIG_DIR="/etc"
 USER_INSTALL_DIR="$HOME/bin"
@@ -990,9 +990,9 @@ show_final_summary() {
     fi
     
     echo -e "${CYAN}🆘 Soporte:${NC}"
-    echo "  • Documentación: https://github.com/usuario/moodle-backup-v3"
-    echo "  • Issues: https://github.com/usuario/moodle-backup-v3/issues"
-    echo "  • GitHub: https://github.com/tu-usuario/moodle-backup-v3"
+    echo "  • Documentación: https://github.com/gzlo/moodle-backup"
+    echo "  • Issues: https://github.com/gzlo/moodle-backup/issues"
+    echo "  • GitHub: https://github.com/gzlo/moodle-backup"
     echo ""
     
     print_success "¡Instalación completada exitosamente!"
