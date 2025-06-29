@@ -1,0 +1,205 @@
+#!/bin/bash
+# ===================== MOODLE BACKUP - WRAPPER SCRIPT =====================
+# Script wrapper para simplificar el uso de moodle_backup.sh
+# Permite usar comandos cortos como 'mb', 'mb config', etc.
+# Autor: Sistema Moodle Backup
+# =====================================================================
+
+# Configuración
+SCRIPT_NAME="moodle_backup.sh"
+SCRIPT_FULL_PATH=""
+
+# Buscar el script principal en ubicaciones comunes
+find_main_script() {
+    local possible_locations=(
+        "/usr/local/bin/moodle-backup"
+        "$HOME/bin/moodle-backup"
+        "$(dirname "$0")/moodle_backup.sh"
+        "./moodle_backup.sh"
+        "/usr/local/bin/moodle_backup.sh"
+        "$HOME/bin/moodle_backup.sh"
+    )
+    
+    for location in "${possible_locations[@]}"; do
+        if [[ -f "$location" ]] && [[ -x "$location" ]]; then
+            SCRIPT_FULL_PATH="$location"
+            return 0
+        fi
+    done
+    
+    echo "❌ Error: No se encontró moodle_backup.sh en ubicaciones conocidas"
+    echo "Ubicaciones verificadas:"
+    printf "  - %s\n" "${possible_locations[@]}"
+    exit 1
+}
+
+# Mostrar ayuda del wrapper
+show_wrapper_help() {
+    cat << 'EOF'
+=== MOODLE BACKUP V3 - COMANDOS RÁPIDOS ===
+
+USO: mb [COMANDO]
+
+COMANDOS DISPONIBLES:
+  mb                    Ejecutar backup completo
+  mb config             Ver configuración actual (--show-config)
+  mb test               Probar conexión Google Drive (--test-rclone)
+  mb help               Ver ayuda completa (--help)
+  mb diag               Diagnóstico del sistema (--diagnose)
+  mb version            Ver versión del script
+  mb status             Estado rápido del último backup
+  mb logs               Ver logs recientes
+  mb clean              Limpiar archivos temporales antiguos
+
+EJEMPLOS:
+  mb                    # Backup normal
+  mb config             # Ver configuración
+  mb test               # Probar Google Drive
+  
+CONFIGURACIÓN FLEXIBLE:
+  PANEL_TYPE=plesk mb config          # Forzar tipo de panel
+  REQUIRE_CONFIG=false mb config      # Permitir auto-detección
+  CLIENT_NAME=test mb                 # Backup con nombre específico
+
+Para ayuda completa: mb help
+EOF
+}
+
+# Función para mostrar logs recientes
+show_recent_logs() {
+    local log_file="/var/log/moodle_backup.log"
+    
+    if [[ -f "$log_file" ]]; then
+        echo "=== LOGS RECIENTES (últimas 20 líneas) ==="
+        tail -20 "$log_file"
+    else
+        echo "⚠️ No se encontró archivo de log en: $log_file"
+        echo "Verificar variable LOG_FILE en configuración"
+    fi
+}
+
+# Función para limpiar archivos temporales
+clean_temp_files() {
+    local tmp_patterns=(
+        "/tmp/moodle_backup*"
+        "/tmp/backup_*"
+        "/var/tmp/moodle_backup*"
+    )
+    
+    echo "🧹 Limpiando archivos temporales antiguos..."
+    
+    for pattern in "${tmp_patterns[@]}"; do
+        # Eliminar archivos más antiguos de 7 días
+        find $(dirname "$pattern") -name "$(basename "$pattern")" -mtime +7 -type f 2>/dev/null | while read -r file; do
+            echo "  Eliminando: $file"
+            rm -f "$file"
+        done
+    done
+    
+    echo "✅ Limpieza completada"
+}
+
+# Función para mostrar estado del último backup
+show_backup_status() {
+    local log_file="/var/log/moodle_backup.log"
+    
+    echo "=== ESTADO DEL ÚLTIMO BACKUP ==="
+    
+    if [[ -f "$log_file" ]]; then
+        # Buscar la última ejecución exitosa
+        local last_success=$(grep "✅.*completado exitosamente" "$log_file" | tail -1)
+        local last_error=$(grep "❌\|ERROR" "$log_file" | tail -1)
+        local last_start=$(grep "Iniciando.*backup" "$log_file" | tail -1)
+        
+        if [[ -n "$last_success" ]]; then
+            echo "✅ Último backup exitoso:"
+            echo "   $last_success"
+        fi
+        
+        if [[ -n "$last_error" ]]; then
+            echo "❌ Último error detectado:"
+            echo "   $last_error"
+        fi
+        
+        if [[ -n "$last_start" ]]; then
+            echo "🚀 Última ejecución iniciada:"
+            echo "   $last_start"
+        fi
+        
+        # Verificar archivos temporales
+        if ls /tmp/moodle_backup* >/dev/null 2>&1; then
+            echo "⚠️ Archivos temporales encontrados en /tmp/"
+            ls -la /tmp/moodle_backup* 2>/dev/null | head -5
+        fi
+        
+    else
+        echo "⚠️ No se encontró archivo de log"
+        echo "El backup aún no se ha ejecutado o LOG_FILE no está configurado"
+    fi
+}
+
+# Función principal
+main() {
+    # Buscar script principal
+    find_main_script
+    
+    local command="${1:-run}"
+    
+    case "$command" in
+        ""|"run")
+            # Ejecutar backup normal
+            exec "$SCRIPT_FULL_PATH"
+            ;;
+        "config"|"show-config"|"--show-config")
+            # Ver configuración
+            exec "$SCRIPT_FULL_PATH" --show-config
+            ;;
+        "test"|"test-rclone"|"--test-rclone")
+            # Probar Google Drive
+            exec "$SCRIPT_FULL_PATH" --test-rclone
+            ;;
+        "help"|"--help"|"-h")
+            # Ver ayuda completa del script principal
+            exec "$SCRIPT_FULL_PATH" --help
+            ;;
+        "diag"|"diagnose"|"--diagnose")
+            # Diagnóstico del sistema
+            exec "$SCRIPT_FULL_PATH" --diagnose
+            ;;
+        "version"|"--version")
+            # Mostrar versión
+            echo "Moodle Backup V3 - Script Universal Multi-Panel"
+            echo "Ubicación: $SCRIPT_FULL_PATH"
+            if [[ -f "$SCRIPT_FULL_PATH" ]]; then
+                grep "^# Fecha:" "$SCRIPT_FULL_PATH" | head -1
+                grep "^# Autor:" "$SCRIPT_FULL_PATH" | head -1
+            fi
+            ;;
+        "status")
+            # Mostrar estado del último backup
+            show_backup_status
+            ;;
+        "logs")
+            # Mostrar logs recientes
+            show_recent_logs
+            ;;
+        "clean")
+            # Limpiar archivos temporales
+            clean_temp_files
+            ;;
+        "wrapper-help")
+            # Ayuda del wrapper
+            show_wrapper_help
+            ;;
+        *)
+            # Comando desconocido, mostrar ayuda
+            echo "❌ Comando desconocido: $command"
+            echo ""
+            show_wrapper_help
+            exit 1
+            ;;
+    esac
+}
+
+# Ejecutar función principal con todos los argumentos
+main "$@"

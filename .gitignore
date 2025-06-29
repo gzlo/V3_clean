@@ -1,0 +1,45 @@
+# Archivos de configuración locales
+*.conf
+!*.conf.example
+
+# Logs
+*.log
+logs/
+
+# Archivos temporales
+*.tmp
+*.temp
+/tmp/
+moodle-backup-install-*/
+
+# Backups locales
+backups/
+*.sql
+*.tar.gz
+*.tar.zst
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Configuraciones de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de prueba
+test_*
+prueba_*
+testing/
+
+# Archivos sensibles
+*password*
+*secret*
+*key*
+
+# Archivos de configuración real (solo ejemplos)
+moodle_backup.conf
+
+# Directorios de trabajo temporal
+tmp_backup_*/
