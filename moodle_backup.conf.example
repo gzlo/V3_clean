@@ -131,7 +131,7 @@ CUSTOM_UPLOAD_TIMEOUT=0
 
 # ===================== CONFIGURACIÓN DE MANTENIMIENTO =====================
 # Título personalizado para página de mantenimiento de Moodle
-MAINTENANCE_TITLE="Mantenimiento - Academia 4HC"
+MAINTENANCE_TITLE="Mantenimiento - Moodle"
 
 # ===================== CONFIGURACIÓN DE LOGGING =====================
 # Archivo de log principal (se puede personalizar por cliente)
