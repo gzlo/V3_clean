@@ -5,6 +5,34 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.4] - 2025-07-01
+
+### 🔄 Refactor: CPANEL_USER → PANEL_USER
+
+#### ✨ Mejora de Nomenclatura Universal
+- **Variable Renombrada**: `CPANEL_USER` → `PANEL_USER` para mayor claridad y universalidad
+- **Compatibilidad Total**: Mantiene soporte completo para `CPANEL_USER` existente
+- **Auto-migración**: Detección automática y migración transparente de configuraciones
+- **Expansión de Variables**: Corregida expansión de `${CPANEL_USER}` y `${PANEL_USER}` en rutas
+
+#### 🔧 Cambios Técnicos
+- **Script Principal**: Actualizado `moodle_backup.sh` con nueva variable y compatibilidad
+- **Instaladores**: Actualizados `install.sh` e `install-interactive.sh` 
+- **Documentación**: Ejemplos en `moodle_backup.conf.example` y `README.md`
+- **Función de Expansión**: Nueva función `expand_configuration_variables()` para variables anidadas
+
+#### 🛡️ Compatibilidad y Migración
+- **Sin Interrupciones**: Configuraciones existentes siguen funcionando sin cambios
+- **Logs Informativos**: Mensajes claros cuando usa compatibilidad hacia atrás
+- **Guía de Migración**: Nuevo archivo `MIGRATION_NOTICE.md` con instrucciones completas
+- **Corrección de Errores**: Solucionado error de sintaxis en `install.sh`
+
+#### 🎯 Beneficios
+- **Claridad**: `PANEL_USER` es más descriptivo para todos los paneles de control
+- **Universalidad**: No sugiere limitación solo a cPanel
+- **Mantenibilidad**: Código más consistente y comprensible
+- **Escalabilidad**: Mejor base para futuras expansiones multi-panel
+
 ## [3.0.3] - 2025-07-01
 
 ### 🐛 Corrección Crítica: Variables de Entorno Vacías

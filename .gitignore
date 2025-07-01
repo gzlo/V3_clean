@@ -8,30 +8,36 @@
 *.log
 logs/
 session_logs/
+/var/log/moodle_backup*.log
 
 # Archivos temporales y de backup
 *.tmp
 *.temp
 /tmp/
+/mnt/*/moodle_backup/
 moodle-backup-install-*/
 backups/
 *.sql
 *.sql.gz
 *.tar.gz
 *.tar.zst
+*.tar.xz
 tmp_backup_*/
 
 # Archivos de sistema
 .DS_Store
 Thumbs.db
 .directory
+*.pid
 
-# Configuraciones de IDE
+# Configuraciones de IDE y editores
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-project
+*.sublime-workspace
 
 # Archivos de desarrollo y pruebas
 test_*
@@ -40,6 +46,7 @@ debug_*
 validate_*
 testing/
 dev/
+benchmark_*/
 
 # Archivos sensibles (por seguridad)
 *password*
@@ -47,6 +54,9 @@ dev/
 *key*
 *auth*
 credentials*
+*.pem
+*.key
+*.crt
 
 # Configuraciones específicas de clientes
 client_configs/
@@ -59,13 +69,20 @@ setup_*
 
 # Archivos de rclone (pueden contener tokens)
 rclone.conf
+*.rclone.conf
 
 # Variables de entorno locales
 .env
 .env.local
 .env.production
+.env.staging
 
 # Archivos de base de datos
 *.db
 *.sqlite
 *.sqlite3
+
+# Archivos de Google Drive/Cloud
+gdrive_tokens/
+*.token
+*.refresh_token

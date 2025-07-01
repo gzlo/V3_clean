@@ -256,7 +256,7 @@ CLIENT_DESCRIPTION="Backup Moodle Cliente"
 
 # Configuración del panel
 PANEL_TYPE="cpanel"              # auto, cpanel, plesk, directadmin, vestacp, manual
-CPANEL_USER="usuario"            # Usuario del panel (si aplica)
+PANEL_USER="usuario"             # Usuario del panel (si aplica)
 
 # Rutas principales
 WWW_DIR="/home/user/public_html"

@@ -450,8 +450,8 @@ manual_configuration_wizard() {
     
     print_step "Configuración manual asistida..."
     
-    echo -n "Usuario cPanel/Panel (dejar vacío si no aplica): "
-    read -r cpanel_user
+    echo -n "Usuario del panel (dejar vacío si no aplica): "
+    read -r panel_user
     
     echo -n "Directorio web de Moodle (ej: /home/user/public_html): "
     read -r www_dir
@@ -628,7 +628,7 @@ CLIENT_DESCRIPTION="$client_description"
 
 # ===================== CONFIGURACIÓN DE PANEL =====================
 PANEL_TYPE="manual"
-CPANEL_USER="$cpanel_user"
+PANEL_USER="$panel_user"
 
 # ===================== DIRECTORIOS PRINCIPALES =====================
 WWW_DIR="$www_dir"
@@ -1028,7 +1028,6 @@ main() {
 # Ejecutar instalador
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
-fi
 fi
 
 echo ""

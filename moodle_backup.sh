@@ -44,7 +44,7 @@ clean_empty_environment_variables() {
     local vars_to_clean=(
         "CLIENT_NAME" "CLIENT_DESCRIPTION" "PANEL_TYPE" "REQUIRE_CONFIG"
         "DB_PASS" "GDRIVE_REMOTE" "MAX_BACKUPS_GDRIVE" "TMP_DIR"
-        "CPANEL_USER" "WWW_DIR" "MOODLEDATA_DIR" "DB_NAME" "DB_USER"
+        "PANEL_USER" "CPANEL_USER" "WWW_DIR" "MOODLEDATA_DIR" "DB_NAME" "DB_USER"
         "NOTIFICATION_EMAILS_EXTRA" "DB_HOST" "DOMAIN_NAME"
     )
     
@@ -113,6 +113,39 @@ load_configuration() {
     fi
     
     return 0
+}
+
+# Función para expandir variables en la configuración
+expand_configuration_variables() {
+    basic_log_info "Expandiendo variables de configuración..."
+    
+    # Compatibilidad hacia atrás: usar CPANEL_USER si existe y PANEL_USER no
+    if [[ -z "${PANEL_USER:-}" ]] && [[ -n "${CPANEL_USER:-}" ]]; then
+        PANEL_USER="$CPANEL_USER"
+        basic_log_info "Compatibilidad: usando CPANEL_USER como PANEL_USER"
+    fi
+    
+    # Lista de variables que pueden contener otras variables
+    local variables_to_expand=(
+        "WWW_DIR"
+        "MOODLEDATA_DIR"
+        "TMP_DIR"
+        "LOG_FILE"
+    )
+    
+    for var in "${variables_to_expand[@]}"; do
+        if [[ -v "$var" ]] && [[ -n "${!var:-}" ]]; then
+            local original_value="${!var}"
+            # Expandir variables usando eval (de forma segura)
+            local expanded_value
+            expanded_value=$(eval echo "\"$original_value\"" 2>/dev/null || echo "$original_value")
+            
+            if [[ "$original_value" != "$expanded_value" ]]; then
+                declare -g "$var"="$expanded_value"
+                basic_log_info "Variable expandida: $var='$original_value' → '$expanded_value'"
+            fi
+        fi
+    done
 }
 
 # Función para detectar el tipo de panel de control
@@ -194,36 +227,42 @@ auto_detect_moodle_config() {
 
 # Función para auto-detectar usuario según el panel
 auto_detect_user() {
-    if [[ -n "${CPANEL_USER:-}" ]]; then
-        basic_log_info "Usuario ya definido: $CPANEL_USER"
+    # Compatibilidad hacia atrás: usar CPANEL_USER si PANEL_USER no está definido
+    if [[ -z "${PANEL_USER:-}" ]] && [[ -n "${CPANEL_USER:-}" ]]; then
+        PANEL_USER="$CPANEL_USER"
+        basic_log_info "Usando CPANEL_USER (compatibilidad): $PANEL_USER"
+    fi
+    
+    if [[ -n "${PANEL_USER:-}" ]]; then
+        basic_log_info "Usuario ya definido: $PANEL_USER"
         return 0
     fi
     
     case "$PANEL_TYPE" in
         "cpanel")
             if [[ -n "${USER:-}" ]] && [[ "$USER" != "root" ]]; then
-                CPANEL_USER="$USER"
-                basic_log_info "Auto-detectado usuario cPanel: $CPANEL_USER"
+                PANEL_USER="$USER"
+                basic_log_info "Auto-detectado usuario cPanel: $PANEL_USER"
             fi
             ;;
         "plesk")
             # En Plesk, el usuario puede no ser relevante, usar dominio
             if [[ -n "${USER:-}" ]] && [[ "$USER" != "root" ]]; then
-                CPANEL_USER="$USER"
-                basic_log_info "Auto-detectado usuario Plesk: $CPANEL_USER"
+                PANEL_USER="$USER"
+                basic_log_info "Auto-detectado usuario Plesk: $PANEL_USER"
             fi
             ;;
         "directadmin"|"vestacp"|"ispconfig")
             if [[ -n "${USER:-}" ]] && [[ "$USER" != "root" ]]; then
-                CPANEL_USER="$USER"
-                basic_log_info "Auto-detectado usuario ${PANEL_TYPE}: $CPANEL_USER"
+                PANEL_USER="$USER"
+                basic_log_info "Auto-detectado usuario ${PANEL_TYPE}: $PANEL_USER"
             fi
             ;;
         "manual")
             basic_log_warn "Instalación manual detectada - Usuario puede no ser relevante"
             if [[ -n "${USER:-}" ]] && [[ "$USER" != "root" ]]; then
-                CPANEL_USER="$USER"
-                basic_log_info "Usando usuario del sistema: $CPANEL_USER"
+                PANEL_USER="$USER"
+                basic_log_info "Usando usuario del sistema: $PANEL_USER"
             fi
             ;;
     esac
@@ -261,7 +300,7 @@ auto_detect_directories() {
 
 # Función específica para cPanel
 auto_detect_directories_cpanel() {
-    local user="${CPANEL_USER:-$USER}"
+    local user="${PANEL_USER:-$USER}"
     
     if [[ -z "$user" ]] || [[ "$user" == "root" ]]; then
         basic_log_warn "No se pudo determinar usuario cPanel válido"
@@ -319,7 +358,7 @@ auto_detect_directories_cpanel() {
 # Función específica para Plesk
 auto_detect_directories_plesk() {
     local domain="${DOMAIN_NAME:-}"
-    local user="${CPANEL_USER:-$USER}"
+    local user="${PANEL_USER:-$USER}"
     
     basic_log_info "Auto-detectando directorios Plesk"
     
@@ -384,7 +423,7 @@ auto_detect_directories_plesk() {
 
 # Función específica para DirectAdmin
 auto_detect_directories_directadmin() {
-    local user="${CPANEL_USER:-$USER}"
+    local user="${PANEL_USER:-$USER}"
     local domain="${DOMAIN_NAME:-}"
     
     if [[ -z "$user" ]] || [[ "$user" == "root" ]]; then
@@ -453,7 +492,7 @@ auto_detect_directories_directadmin() {
 
 # Función específica para VestaCP/HestiaCP
 auto_detect_directories_vestacp() {
-    local user="${CPANEL_USER:-$USER}"
+    local user="${PANEL_USER:-$USER}"
     local domain="${DOMAIN_NAME:-}"
     
     if [[ -z "$user" ]] || [[ "$user" == "root" ]]; then
@@ -522,7 +561,7 @@ auto_detect_directories_vestacp() {
 
 # Función específica para ISPConfig
 auto_detect_directories_ispconfig() {
-    local user="${CPANEL_USER:-$USER}"
+    local user="${PANEL_USER:-$USER}"
     local domain="${DOMAIN_NAME:-}"
     
     basic_log_info "Auto-detectando directorios ISPConfig"
@@ -825,7 +864,7 @@ set_default_configuration() {
     # CORRECCIÓN: Solo establecer si NO están definidas o están vacías
     [[ ! -v CLIENT_NAME || -z "${CLIENT_NAME:-}" ]] && CLIENT_NAME="default"
     [[ ! -v CLIENT_DESCRIPTION || -z "${CLIENT_DESCRIPTION:-}" ]] && CLIENT_DESCRIPTION="Moodle Backup"
-    [[ ! -v CPANEL_USER || -z "${CPANEL_USER:-}" ]] && CPANEL_USER=""
+    [[ ! -v PANEL_USER || -z "${PANEL_USER:-}" ]] && PANEL_USER=""
     [[ ! -v WWW_DIR || -z "${WWW_DIR:-}" ]] && WWW_DIR=""
     [[ ! -v MOODLEDATA_DIR || -z "${MOODLEDATA_DIR:-}" ]] && MOODLEDATA_DIR=""
     [[ ! -v DB_NAME || -z "${DB_NAME:-}" ]] && DB_NAME=""
@@ -913,9 +952,10 @@ esac
 
 # ===================== VARIABLES PRINCIPALES (CONFIGURABLES) =====================
 
-# CORRECCIÓN: Limpiar variables vacías, cargar archivo, luego defaults como fallback
+# CORRECCIÓN: Limpiar variables vacías, cargar archivo, expandir variables, luego defaults como fallback
 clean_empty_environment_variables
 load_configuration
+expand_configuration_variables
 set_default_configuration
 auto_detect_moodle_config
 process_email_configuration
@@ -2194,7 +2234,7 @@ CLIENTE:
   Descripción: $CLIENT_DESCRIPTION
 
 SERVIDOR:
-  Usuario cPanel: $CPANEL_USER
+  Usuario del panel: $PANEL_USER
   Directorio web: $WWW_DIR
   Directorio moodledata: $MOODLEDATA_DIR
   Directorio temporal: $TMP_DIR

@@ -6,8 +6,8 @@
 ```bash
 # Instalar en PATH del sistema
 sudo cp moodle_backup.sh /usr/local/bin/moodle-backup
-sudo chmod +x /usr/local/bin/moodle-backup
-sudo chown root:root /usr/local/bin/moodle-backup
+sudo chmod +x /usr/local/bin/moodle_backup
+sudo chown root:root /usr/local/bin/moodle_backup
 
 # Configuración global
 sudo cp moodle_backup.conf.example /etc/moodle_backup.conf

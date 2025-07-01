@@ -51,13 +51,15 @@ CLIENT_DESCRIPTION="Instalación Moodle Ejemplo"
 # - DirectAdmin: usuario de DirectAdmin
 # - VestaCP: usuario de VestaCP
 # - Manual: usuario del sistema (opcional)
-CPANEL_USER=""
+PANEL_USER=""
 # Ejemplos por panel:
-# cPanel:        CPANEL_USER=miusuario
-# Plesk:         CPANEL_USER=midominio_com (a veces el usuario es irrelevante)
-# DirectAdmin:   CPANEL_USER=usuario_da
-# VestaCP:       CPANEL_USER=usuario_vesta
-# Manual:        CPANEL_USER="" (se usa $USER automáticamente)
+# cPanel:        PANEL_USER=miusuario
+# Plesk:         PANEL_USER=midominio_com (a veces el usuario es irrelevante)
+# DirectAdmin:   PANEL_USER=usuario_da
+# VestaCP:       PANEL_USER=usuario_vesta
+# Manual:        PANEL_USER="" (se usa $USER automáticamente)
+#
+# NOTA: También acepta CPANEL_USER por compatibilidad hacia atrás
 
 # ===================== RUTAS DE MOODLE (PANEL-ESPECÍFICAS) =====================
 # Directorio web de Moodle (si se deja vacío, se auto-detecta según el panel)
@@ -184,7 +186,7 @@ NOTIFICATION_EMAILS_EXTRA="tu-email@ejemplo.com"
 # --- EJEMPLO 1: CLIENTE BÁSICO (hosting compartido) ---
 # CLIENT_NAME=cliente_basico
 # CLIENT_DESCRIPTION="Cliente Básico - Hosting Compartido"
-# CPANEL_USER=cliente1
+# PANEL_USER=cliente1
 # WWW_DIR=""  # Auto-detección
 # MOODLEDATA_DIR=""  # Auto-detección
 # DB_NAME=""  # Auto-detección
@@ -209,7 +211,7 @@ NOTIFICATION_EMAILS_EXTRA="tu-email@ejemplo.com"
 # --- EJEMPLO 3: ENTORNO DE DESARROLLO ---
 # CLIENT_NAME=dev_ambiente
 # CLIENT_DESCRIPTION="Entorno Desarrollo"
-# CPANEL_USER=developer
+# PANEL_USER=developer
 # WWW_DIR=/home/developer/public_html/moodle_dev
 # MOODLEDATA_DIR=/home/developer/moodledata_dev
 # DB_NAME=dev_moodle
@@ -274,7 +276,7 @@ NOTIFICATION_EMAILS_EXTRA="tu-email@ejemplo.com"
 # ---------------------- EJEMPLO: cPanel ----------------------
 # CLIENT_NAME=mi_cliente_cpanel
 # PANEL_TYPE=cpanel
-# CPANEL_USER=miusuario
+# PANEL_USER=miusuario
 # WWW_DIR=/home/miusuario/public_html/moodle
 # MOODLEDATA_DIR=/home/miusuario/moodledata
 # # Las credenciales de BD se auto-detectan desde config.php
@@ -290,7 +292,7 @@ NOTIFICATION_EMAILS_EXTRA="tu-email@ejemplo.com"
 # ---------------------- EJEMPLO: DirectAdmin ----------------------
 # CLIENT_NAME=mi_cliente_da
 # PANEL_TYPE=directadmin
-# CPANEL_USER=usuario_da
+# PANEL_USER=usuario_da
 # DOMAIN_NAME=midominio.com
 # WWW_DIR=/home/usuario_da/domains/midominio.com/public_html
 # MOODLEDATA_DIR=/home/usuario_da/moodledata
@@ -298,7 +300,7 @@ NOTIFICATION_EMAILS_EXTRA="tu-email@ejemplo.com"
 # ---------------------- EJEMPLO: VestaCP/HestiaCP ----------------------
 # CLIENT_NAME=mi_cliente_vesta
 # PANEL_TYPE=vestacp
-# CPANEL_USER=usuario_vesta
+# PANEL_USER=usuario_vesta
 # DOMAIN_NAME=midominio.com
 # WWW_DIR=/home/usuario_vesta/web/midominio.com/public_html
 # MOODLEDATA_DIR=/home/usuario_vesta/moodledata

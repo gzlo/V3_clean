@@ -408,7 +408,7 @@ REQUIRE_CONFIG=false  # Permitir auto-detección como complemento
 
 # ===================== CONFIGURACIÓN ESPECÍFICA =====================
 # Las siguientes variables se auto-detectarán si están vacías
-CPANEL_USER=""        # Se auto-detecta desde \$USER
+PANEL_USER=""        # Se auto-detecta desde \$USER
 WWW_DIR=""           # Se auto-detecta según el panel
 MOODLEDATA_DIR=""    # Se auto-detecta desde config.php
 DOMAIN_NAME=""       # Necesario para Plesk y DirectAdmin
