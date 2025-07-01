@@ -145,7 +145,41 @@ cp /etc/moodle_backup.conf.example /etc/moodle_backup_cliente2.conf
 mb --config /etc/moodle_backup_cliente2.conf --test
 ```
 
-## 🚨 Solución de Problemas
+## �️ Reinstalación Segura
+
+### ⚠️ IMPORTANTE: Backup Antes de Reinstalar
+
+Los scripts de instalación **sobrescriben archivos principales** sin aviso. Para evitar perder tus configuraciones:
+
+```bash
+# 1. ANTES de reinstalar - Hacer backup automático
+./backup-before-reinstall.sh
+
+# 2. Reinstalar normalmente
+curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/install.sh | bash
+
+# 3. DESPUÉS de reinstalar - Restaurar configuraciones
+~/moodle-backup-personal-XXXXXXXX/restore.sh
+
+# 4. Verificar que todo funciona
+mb config && mb test
+```
+
+### 📋 ¿Qué se Sobrescribe vs. Qué se Preserva?
+
+**Se SOBRESCRIBEN (sin aviso):**
+- ❌ `moodle_backup.sh` - Script principal
+- ❌ `mb` - Wrapper de comandos
+- ❌ `moodle_backup.conf.example` - Archivo de ejemplo
+
+**Se PRESERVAN:**
+- ✅ `moodle_backup.conf` - Tu configuración real
+- ✅ Configuración de rclone (solo pregunta si reconfigurar)
+- ✅ Alias de bash (solo agrega si no existe)
+
+📖 **Guía completa**: Ver `REINSTALL_SAFELY.md` para el proceso detallado.
+
+## �🚨 Solución de Problemas
 
 ### Problemas Comunes
 
