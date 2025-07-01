@@ -1,31 +1,38 @@
 # 🚀 Moodle Backup V3 - Sistema Multi-Cliente Mejorado
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
-Sistema avanzado de backup para Moodle con **configuración interactiva paso a paso**, **gestión multi-cliente** y **auto-optimización según recursos del servidor**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
+Sistema avanzado de backup para Moodle con **configuración interactiva inteligente**, **auto-detección de paneles** y **lectura automática de config.php**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
 
-## 🆕 Novedades de la Versión 3
+## 🆕 Novedades de la Versión 3.1
 
-### ✨ Instalación Interactiva Paso a Paso
+### 🎯 Configuración Inteligente y Auto-Detección
+- **Auto-detección de paneles** de control (cPanel, Plesk, DirectAdmin, VestaCP, ISPConfig)
+- **Lectura automática de config.php** para extraer configuración de base de datos
+- **Validación inteligente** de campos (dominio solo obligatorio para Plesk)
+- **Ejemplos dinámicos** de rutas según el panel detectado
+- **Extracción automática** de dominio desde la configuración de Moodle
+
+### ✨ Experiencia de Usuario Mejorada
+- **Interfaz más limpia** con menos emojis en preguntas
+- **Descripções más claras** para cada campo de configuración
+- **Valores predeterminados inteligentes** basados en configuración detectada
+- **Campos opcionales** claramente marcados
+- **Flujo de configuración optimizado** que reduce la entrada manual
+
+### 🔧 Mejoras Técnicas
 - **Detección automática** de capacidades del servidor (CPU, RAM, disco)
 - **Recomendaciones optimizadas** de rendimiento según recursos disponibles
-- **Configuración guiada** de cada sección con preguntas simples y placeholders claros
-- **Validación en tiempo real** de configuraciones
-- **Soporte multi-cliente** desde la instalación
-
-### 🎛️ Gestión Multi-Cliente Simplificada
-- **Comando `mb` mejorado** con menú interactivo
-- **Selección numérica** de clientes (1, 2, 3...)
-- **Gestión individual de cron** (`mb on/off <cliente>`)
-- **Estado visual** de cada configuración (🟢 activo, 🔴 inactivo)
+- **Gestión multi-cliente** desde la instalación
+- **Configuración guiada** con validación en tiempo real
 
 ### 🔐 Seguridad Mejorada
 - **Contraseñas seguras**: Variables de entorno o archivos protegidos
+- **Auto-detección desde config.php** cuando es posible
 - **No almacenamiento en texto plano** en archivos de configuración
-- **Detección automática** desde config.php cuando es posible
 
 ## ⚡ Instalación Rápida
 
@@ -42,12 +49,33 @@ bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/inst
 curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
 ```
 
-- **Un comando**: Instalación completa desde GitHub
-- **Sin dependencias**: Instala automáticamente todo lo necesario
-- **Multi-entorno**: VPS, hosting compartido, servidores dedicados
-- **Verificación**: Comprueba la instalación y funcionalidad
+## 🎛️ Flujo de Configuración Inteligente
 
-## � Flujo de Instalación
+### 1. Auto-Detección de Panel
+```
+✅ Panel detectado automáticamente: cpanel
+¿Usar el panel detectado (cpanel)? [Y/n]: Y
+```
+
+### 2. Lectura Automática de Config.php
+```
+🔧 Leyendo configuración de Moodle desde /home/usuario/public_html/config.php...
+
+✅ Configuración encontrada en Moodle:
+   Tipo de BD: mysqli
+   Host BD: localhost
+   Nombre BD: usuario_moodle
+   Usuario BD: usuario_db
+   Directorio datos: /home/usuario/moodledata
+   URL del sitio: https://moodle.ejemplo.com
+
+¿Usar esta configuración detectada? [Y/n]: Y
+```
+
+### 3. Configuración Simplificada
+- Solo se pregunta por campos que no se pueden detectar
+- Ejemplos dinámicos según el panel detectado
+- Validación inteligente de campos obligatorios
 
 ### 1. Detección del Servidor
 El sistema detecta automáticamente:

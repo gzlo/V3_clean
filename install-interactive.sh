@@ -76,7 +76,7 @@ log_success() { echo -e "${GREEN}✅ $*${NC}"; }
 log_warning() { echo -e "${YELLOW}⚠️  $*${NC}"; }
 log_error() { echo -e "${RED}❌ $*${NC}"; }
 log_step() { echo -e "${PURPLE}🔧 $*${NC}"; }
-log_question() { echo -e "${CYAN}❓ $*${NC}"; }
+log_question() { echo -e "${CYAN}$*${NC}"; }
 
 # Función para pausar y continuar
 wait_continue() {
@@ -131,9 +131,10 @@ ask_with_default() {
     local default="$2"
     local variable_name="$3"
     local description="$4"
+    local required="${5:-true}"  # Nuevo parámetro para indicar si es obligatorio
     
     echo ""
-    log_question "$description"
+    echo -e "${BLUE}$description${NC}"
     echo -e "${CYAN}$prompt${NC}"
     
     if [[ -n "$default" ]]; then
@@ -144,10 +145,12 @@ ask_with_default() {
         fi
     else
         read -r -p "Ingrese valor: " value
-        while [[ -z "$value" ]]; do
-            log_warning "Este campo es obligatorio"
-            read -r -p "Ingrese valor: " value
-        done
+        if [[ "$required" == "true" ]]; then
+            while [[ -z "$value" ]]; do
+                log_warning "Este campo es obligatorio"
+                read -r -p "Ingrese valor: " value
+            done
+        fi
     fi
     
     declare -g "$variable_name"="$value"
@@ -196,6 +199,130 @@ validate_email() {
     fi
 }
 
+# Función para detectar automáticamente el tipo de panel
+detect_control_panel() {
+    log_step "Detectando tipo de panel de control..."
+    
+    # Verificar cPanel
+    if [[ -d "/usr/local/cpanel" ]] || [[ -f "/usr/local/cpanel/cpanel" ]]; then
+        echo "cpanel"
+        return 0
+    fi
+    
+    # Verificar Plesk
+    if [[ -d "/opt/psa" ]] || [[ -f "/usr/local/psa/version" ]]; then
+        echo "plesk"
+        return 0
+    fi
+    
+    # Verificar DirectAdmin
+    if [[ -d "/usr/local/directadmin" ]] || [[ -f "/usr/local/directadmin/directadmin" ]]; then
+        echo "directadmin"
+        return 0
+    fi
+    
+    # Verificar VestaCP
+    if [[ -d "/usr/local/vesta" ]] || [[ -f "/usr/local/vesta/bin/v-list-users" ]]; then
+        echo "vestacp"
+        return 0
+    fi
+    
+    # Verificar ISPConfig
+    if [[ -d "/usr/local/ispconfig" ]] || [[ -f "/usr/local/ispconfig/server/server.sh" ]]; then
+        echo "ispconfig"
+        return 0
+    fi
+    
+    # No se detectó ningún panel conocido
+    echo "manual"
+    return 1
+}
+
+# Función para obtener ejemplos de rutas según el panel
+get_path_examples() {
+    local panel_type="$1"
+    
+    case "$panel_type" in
+        "cpanel")
+            echo "/home/usuario/public_html"
+            ;;
+        "plesk")
+            echo "/var/www/vhosts/dominio.com/httpdocs"
+            ;;
+        "directadmin")
+            echo "/home/usuario/domains/dominio.com/public_html"
+            ;;
+        "vestacp")
+            echo "/home/usuario/web/dominio.com/public_html"
+            ;;
+        "ispconfig")
+            echo "/var/www/clients/client1/web1/web"
+            ;;
+        *)
+            echo "/var/www/html o /home/usuario/public_html"
+            ;;
+    esac
+}
+
+# Función para leer config.php de Moodle y extraer configuración de BD
+read_moodle_config() {
+    local www_dir="$1"
+    local config_file="$www_dir/config.php"
+    
+    if [[ ! -f "$config_file" ]]; then
+        log_warning "No se encontró config.php en $www_dir"
+        return 1
+    fi
+    
+    log_step "Leyendo configuración de Moodle desde $config_file..."
+    
+    # Extraer configuraciones usando grep y sed
+    local db_type=$(grep -E '^\$CFG->dbtype' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local db_host=$(grep -E '^\$CFG->dbhost' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local db_name=$(grep -E '^\$CFG->dbname' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local db_user=$(grep -E '^\$CFG->dbuser' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local db_pass=$(grep -E '^\$CFG->dbpass' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local moodledata=$(grep -E '^\$CFG->dataroot' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    local wwwroot=$(grep -E '^\$CFG->wwwroot' "$config_file" | sed "s/.*['\"]\\([^'\"]*\\)['\"].*/\\1/" | head -1)
+    
+    # Mostrar configuración encontrada
+    echo ""
+    log_success "Configuración encontrada en Moodle:"
+    echo -e "   ${CYAN}Tipo de BD:${NC} $db_type"
+    echo -e "   ${CYAN}Host BD:${NC} $db_host"
+    echo -e "   ${CYAN}Nombre BD:${NC} $db_name"
+    echo -e "   ${CYAN}Usuario BD:${NC} $db_user"
+    echo -e "   ${CYAN}Directorio datos:${NC} $moodledata"
+    echo -e "   ${CYAN}URL del sitio:${NC} $wwwroot"
+    
+    # Preguntar si usar esta configuración
+    echo ""
+    read -r -p "¿Usar esta configuración detectada? [Y/n]: " use_detected
+    
+    if [[ -z "$use_detected" ]] || [[ "$use_detected" =~ ^[Yy] ]]; then
+        # Exportar las variables para uso global
+        export DETECTED_DB_HOST="$db_host"
+        export DETECTED_DB_NAME="$db_name"
+        export DETECTED_DB_USER="$db_user"
+        export DETECTED_DB_PASS="$db_pass"
+        export DETECTED_MOODLEDATA="$moodledata"
+        export DETECTED_WWWROOT="$wwwroot"
+        export DETECTED_DB_TYPE="$db_type"
+        
+        log_success "Configuración de Moodle cargada exitosamente"
+        return 0
+    else
+        log_info "Se solicitará configuración manual"
+        return 1
+    fi
+}
+
+# Función para extraer dominio de la URL
+extract_domain_from_url() {
+    local url="$1"
+    echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|:.*||'
+}
+
 # Función para configurar un cliente paso a paso
 configure_client_interactive() {
     local client_number="$1"
@@ -239,22 +366,49 @@ configure_client_interactive() {
     echo -e "${PURPLE}${BOLD}SECCIÓN 1: CONFIGURACIÓN UNIVERSAL MULTI-PANEL${NC}"
     echo ""
     
-    ask_with_default \
-        "Tipo de panel de control del servidor:" \
-        "auto" \
-        "PANEL_TYPE" \
-        "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+    # Auto-detectar panel primero
+    local detected_panel=$(detect_control_panel)
+    if [[ "$detected_panel" != "manual" ]]; then
+        log_success "Panel detectado automáticamente: $detected_panel"
+        echo ""
+        read -r -p "¿Usar el panel detectado ($detected_panel)? [Y/n]: " use_detected_panel
+        if [[ -z "$use_detected_panel" ]] || [[ "$use_detected_panel" =~ ^[Yy] ]]; then
+            PANEL_TYPE="$detected_panel"
+            log_success "✓ PANEL_TYPE = $PANEL_TYPE"
+        else
+            ask_with_default \
+                "Tipo de panel de control del servidor:" \
+                "$detected_panel" \
+                "PANEL_TYPE" \
+                "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+        fi
+    else
+        ask_with_default \
+            "Tipo de panel de control del servidor:" \
+            "auto" \
+            "PANEL_TYPE" \
+            "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+    fi
     
     ask_yes_no \
         "¿Requerir configuración manual (recomendado: false para auto-detección)?" \
         "false" \
         "REQUIRE_CONFIG"
     
+    # El dominio solo es obligatorio para Plesk
+    local domain_required="false"
+    local domain_description="Opcional para la mayoría de paneles. Solo requerido para Plesk."
+    if [[ "$PANEL_TYPE" == "plesk" ]]; then
+        domain_required="true"
+        domain_description="Requerido para Plesk. Nombre del dominio principal del sitio."
+    fi
+    
     ask_with_default \
         "Nombre del dominio (ejemplo: moodle.ejemplo.com):" \
         "" \
         "DOMAIN_NAME" \
-        "Necesario para algunos paneles como Plesk. Opcional para otros."
+        "$domain_description" \
+        "$domain_required"
     
     ask_yes_no \
         "¿Activar búsqueda agresiva si no encuentra Moodle?" \
@@ -283,48 +437,84 @@ configure_client_interactive() {
     echo -e "${PURPLE}${BOLD}SECCIÓN 3: CONFIGURACIÓN DEL SERVIDOR${NC}"
     echo ""
     
+    # Obtener ejemplos de rutas según el panel
+    local path_example=$(get_path_examples "$PANEL_TYPE")
+    
     case "$PANEL_TYPE" in
         "cpanel")
             ask_with_default \
                 "Usuario de cPanel:" \
                 "" \
                 "PANEL_USER" \
-                "Nombre de usuario de la cuenta de cPanel"
+                "Nombre de usuario de la cuenta de cPanel" \
+                "false"
             ;;
         "plesk")
             ask_with_default \
-                "Usuario de Plesk (puede ser irrelevante en algunos casos):" \
+                "Usuario de Plesk:" \
                 "" \
                 "PANEL_USER" \
-                "Usuario o dominio en Plesk"
+                "Usuario o dominio en Plesk (puede ser opcional en algunos casos)" \
+                "false"
             ;;
         "directadmin")
             ask_with_default \
                 "Usuario de DirectAdmin:" \
                 "" \
                 "PANEL_USER" \
-                "Nombre de usuario de DirectAdmin"
+                "Nombre de usuario de DirectAdmin" \
+                "false"
             ;;
         *)
             ask_with_default \
-                "Usuario del sistema (opcional para auto-detección):" \
+                "Usuario del sistema:" \
                 "" \
                 "PANEL_USER" \
-                "Usuario del sistema, se detectará automáticamente si se deja vacío"
+                "Usuario del sistema. Se detectará automáticamente si se deja vacío" \
+                "false"
             ;;
     esac
     
     ask_with_default \
-        "Directorio web de Moodle (vacío para auto-detección):" \
+        "Directorio web de Moodle (ejemplo: $path_example):" \
         "" \
         "WWW_DIR" \
-        "Ruta completa al directorio donde está instalado Moodle. Ejemplo: /home/usuario/public_html"
+        "Ruta completa al directorio donde está instalado Moodle. Se intentará auto-detectar si se deja vacío" \
+        "false"
     
-    ask_with_default \
-        "Directorio de datos de Moodle (vacío para auto-detección):" \
-        "" \
-        "MOODLEDATA_DIR" \
-        "Ruta al directorio moodledata. Se detectará desde config.php si se deja vacío"
+    # Si se proporcionó WWW_DIR, intentar leer config.php
+    local moodle_config_loaded="false"
+    if [[ -n "$WWW_DIR" ]] && [[ -d "$WWW_DIR" ]]; then
+        if read_moodle_config "$WWW_DIR"; then
+            moodle_config_loaded="true"
+            # Si se cargó la configuración de Moodle, usar valores detectados como predeterminados
+            if [[ -n "$DETECTED_MOODLEDATA" ]]; then
+                MOODLEDATA_DIR="$DETECTED_MOODLEDATA"
+                log_success "✓ MOODLEDATA_DIR = $MOODLEDATA_DIR (desde config.php)"
+            fi
+            
+            # Extraer dominio de la URL si no se especificó
+            if [[ -z "$DOMAIN_NAME" ]] && [[ -n "$DETECTED_WWWROOT" ]]; then
+                local extracted_domain=$(extract_domain_from_url "$DETECTED_WWWROOT")
+                echo ""
+                read -r -p "¿Usar dominio extraído de Moodle ($extracted_domain)? [Y/n]: " use_extracted_domain
+                if [[ -z "$use_extracted_domain" ]] || [[ "$use_extracted_domain" =~ ^[Yy] ]]; then
+                    DOMAIN_NAME="$extracted_domain"
+                    log_success "✓ DOMAIN_NAME = $DOMAIN_NAME (extraído de Moodle)"
+                fi
+            fi
+        fi
+    fi
+    
+    # Solo preguntar por moodledata si no se cargó desde config.php
+    if [[ "$moodle_config_loaded" != "true" ]]; then
+        ask_with_default \
+            "Directorio de datos de Moodle:" \
+            "" \
+            "MOODLEDATA_DIR" \
+            "Ruta al directorio moodledata. Se detectará desde config.php si se deja vacío" \
+            "false"
+    fi
     
     ask_with_default \
         "Directorio temporal para backups:" \
@@ -337,33 +527,59 @@ configure_client_interactive() {
     echo -e "${PURPLE}${BOLD}SECCIÓN 4: CONFIGURACIÓN DE BASE DE DATOS${NC}"
     echo ""
     
+    # Si se cargó la configuración de Moodle, usar valores detectados como predeterminados
+    local default_db_host="localhost"
+    local default_db_name=""
+    local default_db_user=""
+    
+    if [[ "$moodle_config_loaded" == "true" ]]; then
+        default_db_host="${DETECTED_DB_HOST:-localhost}"
+        default_db_name="$DETECTED_DB_NAME"
+        default_db_user="$DETECTED_DB_USER"
+        
+        log_info "Usando configuración detectada de Moodle como valores predeterminados"
+    fi
+    
     ask_with_default \
         "Host de la base de datos:" \
-        "localhost" \
+        "$default_db_host" \
         "DB_HOST" \
         "Normalmente 'localhost' para la mayoría de paneles"
     
     ask_with_default \
-        "Nombre de la base de datos (vacío para auto-detección):" \
-        "" \
+        "Nombre de la base de datos:" \
+        "$default_db_name" \
         "DB_NAME" \
-        "Se detectará desde config.php si se deja vacío"
+        "Nombre de la base de datos de Moodle. Se detectará desde config.php si se deja vacío" \
+        "false"
     
     ask_with_default \
-        "Usuario de la base de datos (vacío para auto-detección):" \
-        "" \
+        "Usuario de la base de datos:" \
+        "$default_db_user" \
         "DB_USER" \
-        "Se detectará desde config.php si se deja vacío"
+        "Usuario para conectar a la base de datos. Se detectará desde config.php si se deja vacío" \
+        "false"
     
     echo ""
-    log_question "¿Desea configurar la contraseña de la base de datos ahora?"
-    log_info "OPCIONES DE SEGURIDAD (ordenadas por seguridad):"
+    echo -e "${BLUE}¿Desea configurar la contraseña de la base de datos ahora?${NC}"
+    echo -e "${BLUE}OPCIONES DE SEGURIDAD (ordenadas por seguridad):${NC}"
     echo "  1. Variable de entorno (MÁS SEGURO)"
     echo "  2. Archivo protegido /etc/mysql/backup.pwd (RECOMENDADO)"
     echo "  3. Ingresar ahora en texto plano (MENOS SEGURO)"
     echo "  4. Auto-detectar desde config.php (RECOMENDADO)"
     echo ""
-    read -r -p "Seleccione opción [1-4] (4 para auto-detección): " db_option
+    
+    local default_option="4"
+    if [[ "$moodle_config_loaded" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+        echo -e "${GREEN}Se detectó contraseña en config.php${NC}"
+        default_option="4"
+    fi
+    
+    read -r -p "Seleccione opción [1-4] ($default_option para auto-detección): " db_option
+    
+    if [[ -z "$db_option" ]]; then
+        db_option="$default_option"
+    fi
     
     case "$db_option" in
         "1")
@@ -386,8 +602,13 @@ configure_client_interactive() {
             log_warning "⚠️  La contraseña se guardará en texto plano en el archivo de configuración"
             ;;
         *)
-            DB_PASS=""
-            log_success "✓ Se auto-detectará desde config.php"
+            if [[ "$moodle_config_loaded" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+                DB_PASS="$DETECTED_DB_PASS"
+                log_success "✓ Contraseña cargada desde config.php de Moodle"
+            else
+                DB_PASS=""
+                log_success "✓ Se auto-detectará desde config.php durante la ejecución"
+            fi
             ;;
     esac
     
@@ -622,7 +843,7 @@ configure_client_interactive() {
 PANEL_TYPE="$PANEL_TYPE"
 REQUIRE_CONFIG=$REQUIRE_CONFIG
 DOMAIN_NAME="$DOMAIN_NAME"
-AUTO_DETECT_AGGRESSIVE="$AUTO_DETECT_AGGRESSIVE"
+AUTO_DETECT_AGGRESSIVE="$AUTO_DETECT_AGRESSIVE"
 
 # ===================== IDENTIFICACIÓN DEL CLIENTE =====================
 CLIENT_NAME="$CLIENT_NAME"
