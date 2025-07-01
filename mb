@@ -41,7 +41,8 @@ show_wrapper_help() {
 USO: mb [COMANDO]
 
 COMANDOS PRINCIPALES:
-  mb                    Ejecutar backup completo
+  mb                    Ejecutar backup en segundo plano (recomendado)
+  mb interactive        Ejecutar backup en primer plano (modo interactivo)
   mb config             Ver configuración actual
   mb test               Probar conectividad y configuración
   mb help               Ver ayuda completa del script principal
@@ -60,15 +61,26 @@ OPCIONES AVANZADAS (compatibilidad completa):
   mb --show-config      Configuración con validación completa
 
 EJEMPLOS:
-  mb                    # Backup normal
-  mb config             # Ver configuración
-  mb test               # Probar conectividad
-  mb logs               # Ver logs recientes
+  mb                              # Backup en segundo plano (recomendado)
+  mb interactive                  # Backup en primer plano
+  mb config                       # Ver configuración
+  mb test                         # Probar conectividad
+  mb logs                         # Ver logs recientes
+  mb status                       # Estado del proceso
   
 CONFIGURACIÓN FLEXIBLE:
   PANEL_TYPE=plesk mb config          # Forzar tipo de panel
   REQUIRE_CONFIG=false mb config      # Permitir auto-detección
   CLIENT_NAME=test mb                 # Backup con nombre específico
+
+MONITOREO AVANZADO:
+  mb logs 50                          # Ver más líneas de log
+  tail -f /var/log/moodle_backup.log  # Seguimiento en tiempo real
+  
+EJECUCIÓN EN SEGUNDO PLANO:
+  Por defecto, 'mb' ejecuta el backup en segundo plano usando nohup.
+  Esto permite que continúe aunque cierre la sesión SSH.
+  Use 'mb interactive' si necesita ver la salida en tiempo real.
 
 Para ayuda completa del script principal: mb help
 EOF
@@ -77,13 +89,38 @@ EOF
 # Función para mostrar logs recientes
 show_recent_logs() {
     local log_file="/var/log/moodle_backup.log"
+    local lines="${1:-30}"
+    
+    echo "=== LOGS RECIENTES (últimas $lines líneas) ==="
+    echo ""
     
     if [[ -f "$log_file" ]]; then
-        echo "=== LOGS RECIENTES (últimas 20 líneas) ==="
-        tail -20 "$log_file"
+        # Verificar si hay proceso en ejecución para ofrecer seguimiento
+        if [[ -f /tmp/moodle_backup_last_pid ]]; then
+            local last_pid=$(cat /tmp/moodle_backup_last_pid)
+            if ps -p "$last_pid" >/dev/null 2>&1; then
+                echo "🔄 Proceso activo detectado (PID: $last_pid)"
+                echo "💡 Para seguimiento en tiempo real: tail -f $log_file"
+                echo ""
+            fi
+        fi
+        
+        tail -n "$lines" "$log_file"
+        echo ""
+        echo "💡 Comandos útiles:"
+        echo "   tail -f $log_file                    # Seguimiento en tiempo real"
+        echo "   mb logs 50                           # Ver más líneas"
+        echo "   grep ERROR $log_file                 # Solo errores"
+        
     else
         echo "⚠️ No se encontró archivo de log en: $log_file"
-        echo "Verificar variable LOG_FILE en configuración"
+        echo ""
+        echo "Posibles ubicaciones alternativas:"
+        for alt_log in "/tmp/moodle_backup*.log" "/var/log/moodle*.log"; do
+            if ls $alt_log >/dev/null 2>&1; then
+                echo "  📁 Encontrado: $alt_log"
+            fi
+        done
     fi
 }
 
@@ -112,34 +149,57 @@ clean_temp_files() {
 show_backup_status() {
     local log_file="/var/log/moodle_backup.log"
     
-    echo "=== ESTADO DEL ÚLTIMO BACKUP ==="
+    echo "=== ESTADO DEL BACKUP MOODLE ==="
+    
+    # Verificar proceso en ejecución
+    if [[ -f /tmp/moodle_backup_last_pid ]]; then
+        local last_pid=$(cat /tmp/moodle_backup_last_pid)
+        if ps -p "$last_pid" >/dev/null 2>&1; then
+            echo "🔄 PROCESO ACTIVO:"
+            echo "   PID: $last_pid"
+            echo "   Estado: Ejecutándose en segundo plano"
+            echo "   Comando: $(ps -p "$last_pid" -o comm= 2>/dev/null)"
+            echo ""
+        else
+            echo "⏹️  Último proceso completado (PID: $last_pid)"
+            echo ""
+        fi
+    fi
     
     if [[ -f "$log_file" ]]; then
         # Buscar la última ejecución exitosa
         local last_success=$(grep "✅.*completado exitosamente" "$log_file" | tail -1)
         local last_error=$(grep "❌\|ERROR" "$log_file" | tail -1)
-        local last_start=$(grep "Iniciando.*backup" "$log_file" | tail -1)
+        local last_start=$(grep "INICIANDO BACKUP" "$log_file" | tail -1)
+        
+        if [[ -n "$last_start" ]]; then
+            echo "🚀 Última ejecución iniciada:"
+            echo "   $last_start"
+            echo ""
+        fi
         
         if [[ -n "$last_success" ]]; then
             echo "✅ Último backup exitoso:"
             echo "   $last_success"
+            echo ""
         fi
         
         if [[ -n "$last_error" ]]; then
             echo "❌ Último error detectado:"
             echo "   $last_error"
-        fi
-        
-        if [[ -n "$last_start" ]]; then
-            echo "🚀 Última ejecución iniciada:"
-            echo "   $last_start"
+            echo ""
         fi
         
         # Verificar archivos temporales
         if ls /tmp/moodle_backup* >/dev/null 2>&1; then
-            echo "⚠️ Archivos temporales encontrados en /tmp/"
-            ls -la /tmp/moodle_backup* 2>/dev/null | head -5
+            echo "📁 Archivos temporales encontrados:"
+            ls -lah /tmp/moodle_backup* 2>/dev/null | head -5
+            echo ""
         fi
+        
+        # Mostrar últimas líneas del log
+        echo "📋 Últimas 5 líneas del log:"
+        tail -5 "$log_file" | sed 's/^/   /'
         
     else
         echo "⚠️ No se encontró archivo de log"
@@ -155,8 +215,38 @@ main() {
     local command="${1:-run}"
     
     case "$command" in
-        # Comando por defecto - ejecutar backup
+        # Comando por defecto - ejecutar backup en segundo plano
         ""|"run")
+            echo "🚀 Iniciando backup de Moodle en segundo plano..."
+            echo "📋 Logs del proceso: /var/log/moodle_backup.log"
+            echo "📋 Logs de sesión: /tmp/moodle_backup_session_*.log"
+            echo ""
+            echo "💡 Para monitorear el progreso use:"
+            echo "   mb logs     - Ver logs recientes"
+            echo "   mb status   - Estado del backup"
+            echo ""
+            
+            # Ejecutar en segundo plano con nohup
+            nohup "$SCRIPT_FULL_PATH" > /tmp/moodle_backup_wrapper_$(date +%s).log 2>&1 &
+            local backup_pid=$!
+            
+            echo "✅ Backup iniciado en segundo plano (PID: $backup_pid)"
+            echo "🔍 El proceso continuará aunque cierre la sesión SSH"
+            echo ""
+            echo "Comandos útiles:"
+            echo "  mb logs     # Ver progreso en tiempo real"
+            echo "  mb status   # Estado actual"
+            echo "  ps -p $backup_pid  # Verificar si el proceso sigue ejecutándose"
+            
+            # Guardar PID para referencia
+            echo "$backup_pid" > /tmp/moodle_backup_last_pid
+            ;;
+            
+        # Comando interactivo - ejecutar en primer plano
+        "interactive"|"foreground"|"fg")
+            echo "🔄 Ejecutando backup en modo interactivo (primer plano)..."
+            echo "⚠️ NOTA: El proceso se detendrá si cierra la sesión SSH"
+            echo ""
             exec "$SCRIPT_FULL_PATH"
             ;;
             
@@ -186,7 +276,9 @@ main() {
             show_backup_status
             ;;
         "logs")
-            show_recent_logs
+            # Permitir especificar número de líneas
+            local lines="${2:-30}"
+            show_recent_logs "$lines"
             ;;
         "clean")
             clean_temp_files

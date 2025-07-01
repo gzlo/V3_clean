@@ -5,6 +5,44 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.5] - 2025-07-01
+
+### 🚀 Mayor Mejora: Ejecución en Segundo Plano
+
+#### ✨ Nueva Funcionalidad Principal
+- **Ejecución Background**: Por defecto, `mb` ejecuta el backup en segundo plano usando `nohup`
+- **Independencia SSH**: El proceso continúa aunque se cierre la sesión SSH
+- **Modo Interactivo**: Nuevo comando `mb interactive` para ejecución en primer plano
+- **Gestión de Procesos**: Sistema robusto de seguimiento y monitoreo de procesos
+
+#### 🔧 Mejoras del Wrapper `mb`
+- **Comando Mejorado**: `mb` → ejecución en segundo plano (recomendado)
+- **Nuevo Comando**: `mb interactive` → ejecución en primer plano (modo legacy)
+- **Estado Avanzado**: `mb status` muestra información detallada del proceso
+- **Logs Mejorados**: `mb logs [número]` con opciones de líneas y seguimiento
+- **PID Tracking**: Guardado automático de PID para seguimiento
+
+#### 🛡️ Validación de Entorno
+- **Nueva Función**: `validate_environment()` agregada para validación completa del sistema
+- **Validaciones Críticas**: 
+  - Permisos de lectura/escritura en directorios
+  - Espacio en disco (mínimo 2GB)
+  - Conectividad de base de datos
+  - Memoria disponible (mínimo 1GB)
+  - Procesos duplicados
+- **Error Detallado**: Reportes específicos de problemas encontrados
+
+#### 💡 Beneficios Operacionales
+- **Confiabilidad**: Sin interrupciones por desconexiones SSH
+- **Monitoreo**: Seguimiento completo del estado y progreso
+- **Flexibilidad**: Opciones para diferentes escenarios de uso
+- **Robustez**: Validaciones preventivas antes de ejecutar
+
+#### 🎯 Casos de Uso
+- **Producción**: `mb` para backups automáticos desatendidos
+- **Desarrollo**: `mb interactive` para debugging y monitoreo directo
+- **Monitoreo**: `mb status` y `mb logs` para seguimiento operacional
+
 ## [3.0.4] - 2025-07-01
 
 ### 🔄 Refactor: CPANEL_USER → PANEL_USER

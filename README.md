@@ -1,6 +1,6 @@
 # 🚀 Moodle Backup V3 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.0.5-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
@@ -85,8 +85,11 @@ Después de la instalación, el sistema se maneja con el wrapper `mb` (MoodleBac
 ### 🎮 Comandos Principales
 
 ```bash
-# Ejecutar backup completo
+# Ejecutar backup en segundo plano (recomendado)
 mb
+
+# Ejecutar backup en primer plano (modo interactivo)
+mb interactive
 
 # Ver configuración actual
 mb config
@@ -104,6 +107,22 @@ mb diagnose
 mb version
 ```
 
+### 🔄 **Nueva Funcionalidad V3.0.5: Ejecución en Segundo Plano**
+
+Por defecto, `mb` ejecuta el backup en **segundo plano** usando `nohup`, permitiendo que continúe aunque cierre la sesión SSH:
+
+```bash
+# Backup desatendido (continúa sin SSH)
+mb
+
+# Monitorear progreso en tiempo real
+mb logs
+mb status
+
+# Backup interactivo (requiere sesión SSH activa)
+mb interactive
+```
+
 **Convención de comandos:**
 - **Comandos simples** (sin dash): Para uso cotidiano - `mb config`, `mb test`, `mb help`
 - **Opciones avanzadas** (con dash): Para compatibilidad completa - `mb --help`, `mb --diagnose`, `mb --show-config`
@@ -114,8 +133,14 @@ mb version
 # Ver logs recientes del último backup
 mb logs
 
-# Ver estado del último backup
+# Ver más líneas de log
+mb logs 50
+
+# Ver estado del último backup con información del proceso
 mb status
+
+# Seguimiento en tiempo real
+tail -f /var/log/moodle_backup.log
 
 # Limpiar archivos temporales antiguos
 mb clean
@@ -129,6 +154,67 @@ mb --help             # Ayuda completa con todas las opciones
 mb --diagnose         # Diagnósticos avanzados del sistema
 mb --test-rclone      # Prueba específica de Google Drive
 mb --show-config      # Configuración con validación completa
+```
+
+## 🔄 Ejecución en Segundo Plano (V3.0.5)
+
+### ✨ Funcionalidad Principal
+
+El sistema V3.0.5 ejecuta backups de forma **desatendida**, independiente de la sesión SSH:
+
+```bash
+# Backup automático (continúa aunque cierre SSH)
+mb
+
+# El sistema muestra:
+🚀 Iniciando backup de Moodle en segundo plano...
+📋 Logs del proceso: /var/log/moodle_backup.log
+📋 Logs de sesión: /tmp/moodle_backup_session_*.log
+
+✅ Backup iniciado en segundo plano (PID: 12345)
+🔍 El proceso continuará aunque cierre la sesión SSH
+
+Comandos útiles:
+  mb logs     # Ver progreso en tiempo real
+  mb status   # Estado actual
+  ps -p 12345 # Verificar si el proceso sigue ejecutándose
+```
+
+### 📊 Monitoreo del Proceso
+
+```bash
+# Ver estado detallado
+mb status
+# Muestra:
+# - PID del proceso activo
+# - Estado de ejecución
+# - Último backup exitoso/error
+# - Archivos temporales
+# - Últimas líneas del log
+
+# Seguimiento en tiempo real
+mb logs
+tail -f /var/log/moodle_backup.log
+
+# Verificar proceso manualmente
+ps aux | grep moodle_backup
+```
+
+### 🎯 Casos de Uso
+
+**Para Producción (Recomendado):**
+```bash
+mb                    # Ejecución desatendida
+```
+
+**Para Desarrollo/Debug:**
+```bash
+mb interactive        # Ver salida en tiempo real
+```
+
+**Para Monitoreo:**
+```bash
+mb status && mb logs  # Estado + logs recientes
 ```
 
 ## ⚙️ Configuración Multi-Cliente
@@ -308,7 +394,7 @@ Durante la instalación, el sistema te permite:
 
 - ✅ **Crear archivo protegido automáticamente** con permisos correctos
 - ✅ **Configurar variable de entorno** para la sesión actual
-- ✅ **Postponer configuración** con instrucciones detalladas
+- ✅ **Postergar configuración** con instrucciones detalladas
 - ✅ **Verificar estado** de todas las configuraciones
 
 ```bash
