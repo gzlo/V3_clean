@@ -48,6 +48,61 @@ AUTO_MODE=false
 SKIP_DEPENDENCIES=false
 SKIP_RCLONE_CONFIG=false
 SKIP_CRON_CONFIG=false
+FROM_PIPE=false
+
+# Detectar si el script se ejecuta desde una tubería
+detect_pipe_execution() {
+    if [ ! -t 0 ]; then
+        FROM_PIPE=true
+        
+        # Si no se especificó modo explícitamente, activar modo auto
+        if [[ "$AUTO_MODE" == false && "$INTERACTIVE_MODE" == true ]]; then
+            print_warning "Script ejecutado desde tubería (curl | bash)"
+            print_info "Activando modo automático para evitar problemas de entrada"
+            print_info "Para modo interactivo, descargue el script y ejecute localmente"
+            print_info "O use: bash <(curl -fsSL URL) --interactive"
+            echo ""
+            AUTO_MODE=true
+            INTERACTIVE_MODE=false
+        fi
+    fi
+}
+
+# Función segura para leer entrada del usuario
+safe_read() {
+    local var_name="$1"
+    local prompt="$2"
+    local default_value="${3:-}"
+    
+    echo -n "$prompt"
+    
+    if [[ "$FROM_PIPE" == true && "$AUTO_MODE" == true ]]; then
+        # Si viene de tubería y está en modo auto, usar valor por defecto
+        eval "$var_name=\"$default_value\""
+        echo "$default_value"
+        return 0
+    fi
+    
+    # Intentar leer desde /dev/tty primero
+    if [[ -r /dev/tty ]]; then
+        read -r "$var_name" < /dev/tty
+    else
+        # Fallback: intentar leer desde stdin normal
+        if read -r "$var_name" 2>/dev/null; then
+            : # Lectura exitosa
+        else
+            # Si falla, usar valor por defecto
+            eval "$var_name=\"$default_value\""
+            echo "$default_value"
+            return 0
+        fi
+    fi
+    
+    # Si está vacío, usar valor por defecto
+    if [[ -z "${!var_name}" && -n "$default_value" ]]; then
+        eval "$var_name=\"$default_value\""
+    fi
+}
 
 # Banner de bienvenida
 print_banner() {
@@ -113,7 +168,8 @@ process_arguments() {
             --interactive)
                 INTERACTIVE_MODE=true
                 AUTO_MODE=false
-                print_info "Modo interactivo activado"
+                FROM_PIPE=false  # Forzar modo interactivo incluso desde tubería
+                print_info "Modo interactivo forzado"
                 ;;
             --skip-deps)
                 SKIP_DEPENDENCIES=true
@@ -345,8 +401,7 @@ install_dependencies() {
             print_info "Dependencias faltantes: ${dependencies_missing[*]}"
             
             if [[ "$AUTO_MODE" == false ]]; then
-                echo -n "¿Continuar sin instalar dependencias? [y/N]: "
-                read -r continue_without_deps
+                safe_read continue_without_deps "¿Continuar sin instalar dependencias? [y/N]: " "N"
                 if [[ ! "$continue_without_deps" =~ ^[Yy]$ ]]; then
                     print_error "Instalación cancelada por el usuario"
                     exit 1
@@ -469,8 +524,7 @@ configure_rclone() {
         print_success "rclone ya tiene configuración de Google Drive (gdrive:)"
         
         if [[ "$AUTO_MODE" == false ]]; then
-            echo -n "¿Desea reconfigurar Google Drive? [y/N]: "
-            read -r response
+            safe_read response "¿Desea reconfigurar Google Drive? [y/N]: " "N"
             if [[ "$response" =~ ^[Yy]$ ]]; then
                 configure_rclone_gdrive
             fi
@@ -481,8 +535,7 @@ configure_rclone() {
         print_info "No se encontró configuración de Google Drive en rclone"
         
         if [[ "$AUTO_MODE" == false ]]; then
-            echo -n "¿Desea configurar Google Drive ahora? [Y/n]: "
-            read -r response
+            safe_read response "¿Desea configurar Google Drive ahora? [Y/n]: " "Y"
             if [[ "$response" =~ ^[Nn]$ ]]; then
                 print_warning "Google Drive no configurado. Deberá configurarlo manualmente más tarde"
                 print_info "Ejecute: rclone config"
@@ -547,13 +600,9 @@ configure_first_client() {
         echo ""
         
         # Información del cliente
-        echo -n "Nombre del cliente [default]: "
-        read -r client_name
-        client_name="${client_name:-default}"
+        safe_read client_name "Nombre del cliente [default]: " "default"
         
-        echo -n "Descripción del cliente [Moodle Backup]: "
-        read -r client_description
-        client_description="${client_description:-Moodle Backup}"
+        safe_read client_description "Descripción del cliente [Moodle Backup]: " "Moodle Backup"
     else
         # Modo automático: usar valores por defecto
         client_name="default"
@@ -592,9 +641,7 @@ configure_cron() {
         echo "2. Horario personalizado"
         echo "3. No configurar ahora"
         echo ""
-        echo -n "Seleccione una opción [1]: "
-        read -r cron_option
-        cron_option="${cron_option:-1}"
+        safe_read cron_option "Seleccione una opción [1]: " "1"
         
         case "$cron_option" in
             "1")
@@ -608,8 +655,7 @@ configure_cron() {
                 echo "Ejemplo: 0 3 * * * = 3:00 AM diariamente"
                 echo "Ejemplo: 30 1 * * 0 = 1:30 AM solo domingos"
                 echo ""
-                echo -n "Ingrese el horario cron: "
-                read -r cron_time
+                safe_read cron_time "Ingrese el horario cron: " "0 2 * * *"
                 cron_description="horario personalizado"
                 ;;
             "3")
@@ -637,8 +683,7 @@ configure_cron() {
         print_warning "Ya existe una tarea de moodle_backup en cron"
         
         if [[ "$AUTO_MODE" == false ]]; then
-            echo -n "¿Desea reemplazarla? [y/N]: "
-            read -r replace_cron
+            safe_read replace_cron "¿Desea reemplazarla? [y/N]: " "N"
             
             if [[ "$replace_cron" =~ ^[Yy]$ ]]; then
                 # Remover entradas existentes y agregar nueva
@@ -760,6 +805,9 @@ show_final_summary() {
 
 # Función principal de instalación
 main() {
+    # Detectar si se ejecuta desde tubería
+    detect_pipe_execution
+    
     # Mostrar banner
     print_banner
     

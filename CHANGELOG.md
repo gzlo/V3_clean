@@ -5,6 +5,58 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.1.1] - 2025-07-01
+
+### 🛠️ Correcciones Críticas del Instalador Web
+
+#### 🚨 Problema Resuelto: Error "N: command not found"
+- **Bug Crítico**: Error `-bash: N: command not found` durante instalación desde tubería (curl | bash)
+- **Causa**: Conflicto de entrada estándar cuando el script se ejecuta con `curl | bash`
+- **Impacto**: Instalación fallaba al responder "N" a preguntas de configuración
+
+#### 🔧 Soluciones Implementadas
+- **Función `safe_read()`**: Nueva función para lectura segura de entrada usando `/dev/tty`
+- **Detección de Tubería**: Auto-detección de ejecución desde `curl | bash`
+- **Modo Auto Inteligente**: Activación automática del modo `--auto` desde tuberías
+- **Manejo Robusto**: Fallback a valores por defecto si falla la entrada
+
+#### ✨ Mejoras en web-install.sh
+```bash
+# Nueva función de entrada segura
+safe_read() { ... }
+
+# Detección automática de tubería
+detect_pipe_execution() { ... }
+
+# Todos los read() reemplazados por safe_read()
+safe_read response "¿Desea reconfigurar Google Drive? [y/N]: " "N"
+```
+
+#### 🎯 Opciones Mejoradas
+- `--auto`: Instalación sin preguntas (se activa automáticamente desde tubería)
+- `--interactive`: Fuerza modo interactivo incluso desde tubería
+- `--skip-rclone`: Omite configuración de rclone
+- `--skip-cron`: Omite configuración de cron
+
+#### 💡 Uso Recomendado Post-Fix
+```bash
+# Instalación automática (recomendada para curl | bash)
+curl -fsSL https://raw.githubusercontent.com/.../web-install.sh | bash
+
+# Instalación interactiva local
+wget https://raw.githubusercontent.com/.../web-install.sh
+chmod +x web-install.sh && ./web-install.sh
+
+# Forzar interactivo desde tubería
+curl -fsSL https://raw.githubusercontent.com/.../web-install.sh | bash -s -- --interactive
+```
+
+#### 📋 Archivos Agregados
+- `FIX-README.md`: Documentación detallada del problema y solución
+- `test-install.sh`: Script de pruebas para validar funcionamiento
+
+---
+
 ## [3.1.0] - 2025-07-01
 
 ### 🚀 MAJOR: Verificación Inteligente de Procesos y Limpieza Automática
