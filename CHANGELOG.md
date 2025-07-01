@@ -5,6 +5,27 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.2] - 2025-07-01
+
+### 🐛 Corrección de Errores
+
+#### 🔧 Instalador Web Corregido
+- **Fix para BASH_SOURCE Variable**: Corregido error `BASH_SOURCE[0]: unbound variable` en línea 799
+- **Compatibilidad con Pipe**: Mejorada compatibilidad cuando se ejecuta vía `curl | bash`
+- **Detección de Contexto**: Agregada lógica para detectar si el script se ejecuta directamente o vía pipe
+- **Manejo de Variables Seguro**: Implementada expansión de parámetros segura `${BASH_SOURCE[0]:-}`
+
+#### 📋 Detalles Técnicos
+- **Problema Original**: El flag `-u` de `set -euo pipefail` causaba fallo con variables no definidas
+- **Contexto**: `BASH_SOURCE` puede no estar definida en algunos contextos de ejecución via pipe
+- **Solución**: Uso de expansión de parámetros con valor por defecto y condición adicional
+- **Compatibilidad**: Funciona tanto en ejecución directa como via `curl | bash`
+
+#### 🎯 Impacto
+- **Instalación Confiable**: El instalador web ahora funciona correctamente en todos los contextos
+- **Sin Cambios Funcionales**: La corrección no afecta ninguna funcionalidad existente
+- **Mejor Experiencia**: Eliminado el error que impedía la instalación automática
+
 ## [3.0.1] - 2025-06-29
 
 ### 🔒 Seguridad y Configuración Mejorada

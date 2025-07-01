@@ -796,6 +796,7 @@ main() {
 }
 
 # Ejecutar instalador
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+# Cuando se ejecuta directamente o a través de pipe (curl | bash)
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]] || [[ -z "${BASH_SOURCE[0]:-}" ]]; then
     main "$@"
 fi
