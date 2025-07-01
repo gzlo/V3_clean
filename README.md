@@ -1,82 +1,173 @@
-# 🚀 Moodle Backup V3.1 - Sistema Universal de Backups
+# 🚀 Moodle Backup V3 - Sistema Multi-Cliente Mejorado
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
-Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección inteligente, sincronización con Google Drive, verificación inteligente de procesos y configuración universal. Diseñado para funcionar en cualquier entorno: desde hosting compartido hasta VPS dedicados.
+Sistema avanzado de backup para Moodle con **configuración interactiva paso a paso**, **gestión multi-cliente** y **auto-optimización según recursos del servidor**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
 
-## ⚡ Instalación Rápida (1 línea)
+## 🆕 Novedades de la Versión 3
+
+### ✨ Instalación Interactiva Paso a Paso
+- **Detección automática** de capacidades del servidor (CPU, RAM, disco)
+- **Recomendaciones optimizadas** de rendimiento según recursos disponibles
+- **Configuración guiada** de cada sección con preguntas simples y placeholders claros
+- **Validación en tiempo real** de configuraciones
+- **Soporte multi-cliente** desde la instalación
+
+### 🎛️ Gestión Multi-Cliente Simplificada
+- **Comando `mb` mejorado** con menú interactivo
+- **Selección numérica** de clientes (1, 2, 3...)
+- **Gestión individual de cron** (`mb on/off <cliente>`)
+- **Estado visual** de cada configuración (🟢 activo, 🔴 inactivo)
+
+### 🔐 Seguridad Mejorada
+- **Contraseñas seguras**: Variables de entorno o archivos protegidos
+- **No almacenamiento en texto plano** en archivos de configuración
+- **Detección automática** desde config.php cuando es posible
+
+## ⚡ Instalación Rápida
+
+### Método Recomendado: Instalador Interactivo
 
 ```bash
-# Instalación automática desde GitHub (recomendado)
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
-
-# O usando wget
-wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
+bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install-interactive.sh)
 ```
 
-### 🔧 Instalación con Opciones
+### Instalación Automatizada (Sin interacción)
 
 ```bash
-# Instalación completamente automática (sin preguntas)
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto
-
-# Instalación interactiva personalizada
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --interactive
-
-# Instalación omitiendo ciertas configuraciones
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
+# Para entornos donde no se puede usar modo interactivo
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
 ```
-
-## 🎯 Características Principales
-
-### ✨ **Auto-detección Inteligente**
-
-- **Paneles de Control**: cPanel, Plesk, DirectAdmin, VestaCP, ISPConfig, Manual
-- **Rutas de Moodle**: Detecta automáticamente www y moodledata
-- **Configuración de BD**: Lee config.php para obtener credenciales
-- **Sistema Operativo**: Soporta CentOS/RHEL, Ubuntu/Debian, Fedora, Rocky Linux
-
-### 🛡️ **Verificación Inteligente de Procesos (V3.1)**
-
-- **Detección Avanzada**: Distingue entre procesos válidos y huérfanos/colgados
-- **Limpieza Automática**: Elimina automáticamente procesos >2 horas sin intervención manual
-- **Lockfiles Inteligentes**: Sistema robusto de lockfiles por cliente para entornos multi-cliente
-- **Manejo de Señales**: Limpieza automática al recibir señales de interrupción (Ctrl+C, SIGTERM, etc.)
-
-### 🚀 **Instalación Universal**
 
 - **Un comando**: Instalación completa desde GitHub
 - **Sin dependencias**: Instala automáticamente todo lo necesario
 - **Multi-entorno**: VPS, hosting compartido, servidores dedicados
 - **Verificación**: Comprueba la instalación y funcionalidad
 
-### 🛡️ **Backup Inteligente**
+## � Flujo de Instalación
 
-- **Compresión avanzada**: zstd para máxima eficiencia
-- **Multi-hilo**: Acelera significativamente el proceso
-- **Verificación**: Comprueba integridad de archivos y BD
-- **Limpieza automática**: Mantiene solo los backups necesarios
+### 1. Detección del Servidor
+El sistema detecta automáticamente:
+- **CPU**: Núcleos disponibles
+- **RAM**: Memoria total
+- **Espacio**: Disco libre
+- **Recomendaciones**: Compresión y threads óptimos
 
-### ☁️ **Sincronización en la Nube**
+### 2. Configuración por Secciones
 
-- **Google Drive**: Configuración automática con rclone
-- **Gestión inteligente**: Rotación automática de backups antiguos
-- **Verificación**: Comprueba subida y integridad
-- **Recuperación**: Descarga directa desde la nube
+#### 🏢 **Configuración Universal Multi-Panel**
+- Tipo de panel: `auto`, `cpanel`, `plesk`, `directadmin`, `vestacp`, `ispconfig`, `manual`
+- Auto-detección agresiva: búsqueda en todo el sistema
+- Configuración de dominio (necesario para algunos paneles)
 
-### 📊 **Monitoreo y Logging**
+#### 👤 **Identificación del Cliente**
+- Nombre único del cliente (sin espacios)
+- Descripción amigable para logs y notificaciones
 
-- **Logs detallados**: Registro completo de todas las operaciones
-- **Notificaciones**: Email en caso de errores o éxito
-- **Diagnósticos**: Herramientas de análisis y troubleshooting
-- **Métricas**: Tiempo, tamaño, velocidad de transferencia
+#### 🖥️ **Configuración del Servidor**
+- Usuario del panel de control
+- Directorios web y de datos (auto-detecta si se deja vacío)
+- Directorio temporal para backups
+
+#### 🗄️ **Base de Datos**
+- Host, nombre y usuario (auto-detecta desde config.php)
+- **Configuración segura de contraseña**:
+  1. Variable de entorno (MÁS SEGURO)
+  2. Archivo protegido (RECOMENDADO)
+  3. Auto-detección desde config.php (RECOMENDADO)
+  4. Texto plano (solo desarrollo)
+
+#### ☁️ **Google Drive**
+- Verificación automática de rclone
+- Configuración asistida si es necesario
+- Carpeta destino personalizable
+- Número de backups a mantener
+
+#### ⚡ **Rendimiento**
+- Configuración **optimizada automáticamente** según servidor detectado
+- Threads concurrentes recomendados
+- Nivel de compresión óptimo
+- Horario de mayor rendimiento configurable
+
+#### 📧 **Notificaciones (OBLIGATORIO)**
+- Email(s) para notificaciones (validación automática)
+- Soporte para múltiples destinatarios
+
+#### ⏰ **Programación (Cron)**
+- **Frecuencias predefinidas**:
+  - Diario
+  - Cada 2 días
+  - Semanal (domingos)
+  - Quincenal (1° y 15 de cada mes)
+  - Mensual (día 1)
+  - Personalizado
+- Hora de ejecución configurable
+- Configuración automática del crontab
+
+## 🎮 Uso del Sistema
+
+### Comando Principal: `mb`
+
+#### Menú Interactivo
+```bash
+mb
+```
+
+Muestra un menú interactivo con:
+- Lista numerada de clientes configurados
+- Estado visual de cada configuración
+- Opciones de gestión
+
+```
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    MOODLE BACKUP V3 - GESTOR MULTI-CLIENTE                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+CONFIGURACIONES DISPONIBLES:
+
+ 1. empresa_com     - Sitio principal empresa.com - 🟢 Activo
+ 2. cliente_dev     - Entorno de desarrollo - 🔴 Inactivo
+ 3. backup_test     - Servidor de pruebas - 🟢 Activo
+
+OPCIONES DISPONIBLES:
+  [1-3]  Ejecutar backup para cliente específico
+  list   Mostrar lista de configuraciones
+  on     Habilitar cron para un cliente
+  off    Deshabilitar cron para un cliente
+  status Ver estado de todos los clientes
+  logs   Ver logs recientes
+  help   Mostrar ayuda completa
+  exit   Salir
+
+Seleccione una opción:
+```
+
+#### Comandos Directos
+
+##### Gestión de Cron
+```bash
+mb on empresa_com    # Habilitar cron para empresa_com
+mb off empresa_com   # Deshabilitar cron para empresa_com
+```
+
+##### Información y Estado
+```bash
+mb list              # Listar todas las configuraciones
+mb status            # Estado completo de todos los clientes
+mb logs              # Ver logs recientes de un cliente específico
+```
+
+##### Ayuda
+```bash
+mb help              # Ayuda completa del sistema
+```
 
 ## 🖥️ Paneles Soportados
 
-| Panel                | Auto-detección | Configuración |  Estado  |
+| Panel                | Auto-detección | Multi-Cliente |  Estado  |
 | -------------------- | :------------: | :-----------: | :------: |
 | **cPanel**           |       ✅        |       ✅       | Completo |
 | **Plesk**            |       ✅        |       ✅       | Completo |
@@ -85,24 +176,72 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install
 | **ISPConfig**        |       ✅        |       ✅       | Completo |
 | **Manual**           |       ✅        |       ✅       | Completo |
 
-## 📋 Uso Básico
+## � Estructura de Archivos
 
-Después de la instalación, el sistema se maneja con el wrapper `mb` (MoodleBackup):
+```
+/etc/moodle-backup/configs/
+├── cliente1.conf           # Configuración cliente 1
+├── cliente2.conf           # Configuración cliente 2
+├── empresa_com.conf        # Configuración empresa
+└── .cron_status           # Estado de cron de cada cliente
 
-### 🎮 Comandos Principales
+/usr/local/bin/
+├── mb                     # Comando principal mejorado
+└── moodle_backup.sh       # Script principal de backup
 
+/var/log/
+├── moodle_backup_cliente1.log    # Log específico cliente 1
+├── moodle_backup_cliente2.log    # Log específico cliente 2
+└── moodle_backup_empresa_com.log # Log específico empresa
+```
+
+## 🔐 Seguridad
+
+### Contraseñas de Base de Datos
+El sistema maneja las contraseñas de forma segura con múltiples opciones:
+
+1. **Variable de entorno** (MÁS SEGURO):
+   ```bash
+   export MYSQL_PASSWORD="tu_password"
+   ```
+
+2. **Archivo protegido** (RECOMENDADO):
+   ```bash
+   echo "tu_password" | sudo tee /etc/mysql/backup.pwd
+   sudo chmod 600 /etc/mysql/backup.pwd
+   ```
+
+3. **Auto-detección desde config.php** (RECOMENDADO):
+   - Extrae credenciales directamente del archivo de configuración de Moodle
+   - Sin almacenamiento adicional de contraseñas
+
+### Permisos de Archivos
+- Archivos de configuración: `600` (solo lectura del propietario)
+- Directorio de configuraciones: `755`
+- Logs: permisos restrictivos según el sistema
+
+## 📊 Monitoreo
+
+### Estado en Tiempo Real
 ```bash
-# Ejecutar backup en segundo plano (recomendado)
-mb
+mb status
+```
 
-# Ejecutar backup en primer plano (modo interactivo)
-mb interactive
+Muestra para cada cliente:
+- 📋 Descripción
+- 🟢/🔴 Estado del cron (habilitado/deshabilitado)
+- 🔄/⏸️ Estado de ejecución (ejecutándose/inactivo)
+- 📅 Fecha del último backup
+- 📝 Disponibilidad de logs
 
-# Ver configuración actual
-mb config
+### Logs Detallados
+```bash
+mb logs
+```
 
-# Probar conectividad y configuración
-mb test
+- Selección interactiva del cliente
+- Opción de ver logs de todos los clientes
+- Seguimiento en tiempo real con `tail -f`
 
 # Diagnóstico completo del sistema
 mb diagnose
@@ -508,31 +647,125 @@ CLIENT_NAME=cliente3 mb        # ✅ Independiente
 
 ### 🛠️ Herramientas de Mantenimiento (V3.1)
 
+## 🚀 Características Avanzadas
+
+### Detección Inteligente
+- **Tipo de panel**: Detección automática del entorno
+- **Recursos del servidor**: CPU, RAM, espacio en disco
+- **Rutas de Moodle**: Búsqueda en ubicaciones estándar
+- **Configuración de BD**: Extracción desde config.php
+
+### Optimización Automática
+- **Threads concurrentes**: Basado en CPU disponible
+- **Nivel de compresión**: Equilibrio entre velocidad y espacio
+- **Horarios optimizados**: Configuración de ventanas de alto rendimiento
+- **Timeouts dinámicos**: Adaptación a velocidad de conexión
+
+### Gestión Multi-Cliente
+- **Configuraciones independientes**: Cada cliente con sus propios parámetros
+- **Cron individual**: Habilitación/deshabilitación sin afectar otros
+- **Logs separados**: Un archivo por cliente para mejor organización
+- **Estados persistentes**: Mantiene configuración al habilitar/deshabilitar
+
+## 🆘 Resolución de Problemas
+
+### Problemas Comunes
+
+#### 1. No se encuentran configuraciones
 ```bash
-# Verificar estado de procesos y lockfiles
-./cleanup_processes.sh --status
+# Verificar directorio
+ls -la /etc/moodle-backup/configs/
 
-# Limpieza forzada de procesos colgados
-./cleanup_processes.sh --force
-
-# Ver ayuda del script de limpieza
-./cleanup_processes.sh --help
+# Reinstalar si es necesario
+bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install-interactive.sh)
 ```
+
+#### 2. Cron no funciona
+```bash
+# Verificar crontab
+crontab -l | grep "Moodle Backup"
+
+# Habilitar manualmente
+mb on nombre_cliente
+```
+
+#### 3. Logs no aparecen
+```bash
+# Verificar permisos del directorio de logs
+ls -la /var/log/moodle_backup*
+
+# Verificar configuración
+mb status
+```
+
+#### 4. rclone no configurado
+```bash
+# Configurar Google Drive
+rclone config
+
+# Verificar configuración
+rclone listremotes
+```
+
+## 🔄 Migración desde Versiones Anteriores
+
+Si tiene una instalación previa, el nuevo instalador:
+- Detecta configuraciones existentes
+- Ofrece migración automática
+- Mantiene configuraciones de rclone
+- Preserva programaciones de cron existentes
+
+## 🏆 Ventajas del Nuevo Sistema
+
+### Para Administradores
+- ✅ **Sin edición manual** de archivos de configuración
+- ✅ **Configuración guiada** paso a paso
+- ✅ **Optimización automática** según recursos del servidor
+- ✅ **Gestión simplificada** con comandos intuitivos
+
+### Para Múltiples Clientes
+- ✅ **Un servidor, múltiples configuraciones** independientes
+- ✅ **Gestión individual** de cada cliente (on/off)
+- ✅ **Logs separados** para mejor organización
+- ✅ **Programaciones personalizadas** por cliente
+
+### Para Seguridad
+- ✅ **Contraseñas seguras** (variables de entorno/archivos protegidos)
+- ✅ **No texto plano** en configuraciones
+- ✅ **Permisos restrictivos** en archivos críticos
+- ✅ **Auto-detección segura** desde config.php
+
+### Para Usabilidad
+- ✅ **Menú interactivo** claro y visual
+- ✅ **Selección numérica** simple (1, 2, 3...)
+- ✅ **Estados visuales** (🟢 activo, 🔴 inactivo)
+- ✅ **Comandos memorizables** (mb on/off)
 
 ## 📞 Soporte
 
 ### 🆘 Obtener Ayuda
 
 - **Issues**: [GitHub Issues](https://github.com/gzlo/moodle-backup/issues)
-- **Documentación**: Ver carpeta `docs/` para guías detalladas
+- **Documentación**: Ver archivos de ejemplo en el repositorio
+- **Demo**: Ejecutar `./demo_new_system.sh` para ver características
 
 ### 🤝 Contribuir
 
 1. Fork el repositorio
 2. Crea una rama para tu feature (`git checkout -b feature/nueva-caracteristica`)
-3. Commit tus cambios (`git commit -am 'Agrega nueva característica'`)
+3. Commit tus cambios siguiendo [Conventional Commits](https://conventionalcommits.org/)
 4. Push a la rama (`git push origin feature/nueva-caracteristica`)
 5. Crea un Pull Request
+
+### 📋 Formato de Commits
+
+Usamos **Conventional Commits** en español:
+
+```
+feat(instalador): agregar configuración interactiva paso a paso
+fix(mb): corregir selección de cliente en menú
+docs(readme): actualizar documentación del sistema V3
+```
 
 ## 📜 Licencia
 
@@ -540,14 +773,17 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## 🙏 Créditos
 
-Desarrollado por **gzlo** - Especialista en infraestructura Moodle y hosting optimizado.
+Desarrollado por **gzlo** - Especialista en infraestructura Moodle y sistemas de backup automatizados.
 
 - **Autor**: gzlo
-- **Versión**: 3.0.1
-- **Última actualización**: 2025-06-29
+- **Versión**: 3.0.0
+- **Última actualización**: 2025-07-01
+- **Repositorio**: [github.com/gzlo/moodle-backup](https://github.com/gzlo/moodle-backup)
 
 ---
 
 ⭐ **¿Te resulta útil?** ¡Dale una estrella al repositorio y compártelo!
 
-📧 **¿Necesitas soporte?** Abre un [Issue en GitHub](https://github.com/gzlo/moodle-backup/issues) o consulta la documentación.
+📧 **¿Necesitas soporte personalizado?** Abre un [Issue en GitHub](https://github.com/gzlo/moodle-backup/issues) o consulta la documentación.
+
+🚀 **¿Quieres contribuir?** ¡Las contribuciones son bienvenidas! Lee nuestra guía de contribución.

@@ -1,23 +1,39 @@
 #!/bin/bash
-# ===================== MOODLE BACKUP - WRAPPER SCRIPT =====================
-# Script wrapper para simplificar el uso de moodle_backup.sh
-# Permite usar comandos cortos como 'mb', 'mb config', etc.
+# ===================== MOODLE BACKUP - WRAPPER SCRIPT V3 =====================
+# Script wrapper mejorado para manejo multi-cliente de moodle_backup.sh
+# Permite selección interactiva de clientes y gestión de cron
 # Autor: Sistema Moodle Backup
 # =====================================================================
+
+# Colores
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+BOLD='\033[1m'
 
 # Configuración
 SCRIPT_NAME="moodle_backup.sh"
 SCRIPT_FULL_PATH=""
+CONFIG_DIR="/etc/moodle-backup/configs"
+
+# Funciones de logging
+log_info() { echo -e "${BLUE}ℹ️  $*${NC}"; }
+log_success() { echo -e "${GREEN}✅ $*${NC}"; }
+log_warning() { echo -e "${YELLOW}⚠️  $*${NC}"; }
+log_error() { echo -e "${RED}❌ $*${NC}"; }
 
 # Buscar el script principal en ubicaciones comunes
 find_main_script() {
     local possible_locations=(
-        "/usr/local/bin/moodle-backup"
-        "$HOME/bin/moodle-backup"
-        "$(dirname "$0")/moodle_backup.sh"
-        "./moodle_backup.sh"
+        "/usr/local/bin/moodle-backup/moodle_backup.sh"
         "/usr/local/bin/moodle_backup.sh"
         "$HOME/bin/moodle_backup.sh"
+        "$(dirname "$0")/moodle_backup.sh"
+        "./moodle_backup.sh"
     )
     
     for location in "${possible_locations[@]}"; do
@@ -27,27 +43,577 @@ find_main_script() {
         fi
     done
     
-    echo "❌ Error: No se encontró moodle_backup.sh en ubicaciones conocidas"
+    log_error "No se encontró moodle_backup.sh en ubicaciones conocidas"
     echo "Ubicaciones verificadas:"
     printf "  - %s\n" "${possible_locations[@]}"
     exit 1
 }
 
-# Mostrar ayuda del wrapper
-show_wrapper_help() {
-    cat << 'EOF'
-🚀 MOODLE BACKUP V3 - WRAPPER SCRIPT
+# Mostrar header del menú principal
+print_menu_header() {
+    clear
+    echo -e "${BLUE}${BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║                    MOODLE BACKUP V3 - GESTOR MULTI-CLIENTE                 ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+}
 
-USO: mb [COMANDO]
+# Listar configuraciones disponibles
+list_configurations() {
+    local configs=()
+    local descriptions=()
+    local statuses=()
+    
+    if [[ ! -d "$CONFIG_DIR" ]]; then
+        log_warning "No se encontró el directorio de configuraciones: $CONFIG_DIR"
+        return 1
+    fi
+    
+    # Leer archivo de estados de cron
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    declare -A cron_states
+    if [[ -f "$cron_status_file" ]]; then
+        while IFS=: read -r client status schedule; do
+            cron_states["$client"]="$status"
+        done < "$cron_status_file"
+    fi
+    
+    # Buscar archivos de configuración
+    for config_file in "$CONFIG_DIR"/*.conf; do
+        if [[ -f "$config_file" ]]; then
+            local client_name=$(basename "$config_file" .conf)
+            local client_desc=""
+            
+            # Extraer descripción del archivo
+            if [[ -f "$config_file" ]]; then
+                client_desc=$(grep "^CLIENT_DESCRIPTION=" "$config_file" | cut -d'"' -f2 2>/dev/null || echo "Sin descripción")
+            fi
+            
+            # Determinar estado del cron
+            local cron_status="${cron_states[$client_name]:-unknown}"
+            local status_icon=""
+            case "$cron_status" in
+                "enabled") status_icon="${GREEN}🟢 Activo${NC}" ;;
+                "disabled") status_icon="${RED}🔴 Inactivo${NC}" ;;
+                *) status_icon="${YELLOW}❓ Desconocido${NC}" ;;
+            esac
+            
+            configs+=("$client_name")
+            descriptions+=("$client_desc")
+            statuses+=("$status_icon")
+        fi
+    done
+    
+    if [[ ${#configs[@]} -eq 0 ]]; then
+        log_warning "No se encontraron configuraciones de clientes"
+        log_info "Ejecute el instalador para crear configuraciones"
+        return 1
+    fi
+    
+    echo ""
+    echo -e "${CYAN}${BOLD}CONFIGURACIONES DISPONIBLES:${NC}"
+    echo ""
+    
+    for i in "${!configs[@]}"; do
+        local num=$((i + 1))
+        printf "%2d. ${GREEN}%-15s${NC} - %s - %s\n" "$num" "${configs[i]}" "${descriptions[i]}" "${statuses[i]}"
+    done
+    
+    echo ""
+    return 0
+}
+
+# Menú principal de selección
+show_main_menu() {
+    print_menu_header
+    
+    if ! list_configurations; then
+        echo ""
+        log_info "Para crear configuraciones, ejecute el instalador:"
+        echo "   bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install-interactive.sh)"
+        exit 1
+    fi
+    
+    echo -e "${CYAN}${BOLD}OPCIONES DISPONIBLES:${NC}"
+    echo ""
+    echo "  [1-N]  Ejecutar backup para cliente específico"
+    echo "  list   Mostrar lista de configuraciones"
+    echo "  on     Habilitar cron para un cliente"
+    echo "  off    Deshabilitar cron para un cliente"
+    echo "  status Ver estado de todos los clientes"
+    echo "  logs   Ver logs recientes"
+    echo "  help   Mostrar ayuda completa"
+    echo "  exit   Salir"
+    echo ""
+    
+    read -r -p "Seleccione una opción: " choice
+    echo ""
+    
+    case "$choice" in
+        [0-9]*)
+            execute_backup_by_number "$choice"
+            ;;
+        "list")
+            list_configurations
+            wait_for_enter
+            ;;
+        "on")
+            enable_cron_interactive
+            ;;
+        "off")
+            disable_cron_interactive
+            ;;
+        "status")
+            show_all_status
+            wait_for_enter
+            ;;
+        "logs")
+            show_recent_logs
+            wait_for_enter
+            ;;
+        "help")
+            show_full_help
+            wait_for_enter
+            ;;
+        "exit"|"quit"|"q")
+            log_info "¡Hasta luego!"
+            exit 0
+            ;;
+        *)
+            log_warning "Opción inválida: $choice"
+            wait_for_enter
+            ;;
+    esac
+}
+
+# Ejecutar backup por número de cliente
+execute_backup_by_number() {
+    local selection="$1"
+    
+    # Obtener lista de configuraciones
+    local configs=()
+    for config_file in "$CONFIG_DIR"/*.conf; do
+        if [[ -f "$config_file" ]]; then
+            configs+=($(basename "$config_file" .conf))
+        fi
+    done
+    
+    # Validar selección
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [[ "$selection" -lt 1 ]] || [[ "$selection" -gt ${#configs[@]} ]]; then
+        log_error "Selección inválida: $selection"
+        log_info "Debe ser un número entre 1 y ${#configs[@]}"
+        wait_for_enter
+        return 1
+    fi
+    
+    # Obtener configuración seleccionada
+    local index=$((selection - 1))
+    local client_name="${configs[index]}"
+    local config_file="$CONFIG_DIR/$client_name.conf"
+    
+    log_info "Ejecutando backup para cliente: $client_name"
+    
+    # Confirmar ejecución
+    read -r -p "¿Confirma la ejecución del backup? [y/N]: " confirm
+    if [[ ! "$confirm" =~ ^[yY]$ ]]; then
+        log_info "Ejecución cancelada"
+        wait_for_enter
+        return 0
+    fi
+    
+    # Ejecutar backup
+    echo ""
+    log_info "Iniciando backup en segundo plano..."
+    
+    # Ejecutar con configuración específica
+    CONFIG_FILE="$config_file" nohup "$SCRIPT_FULL_PATH" > "/tmp/mb_$client_name.log" 2>&1 &
+    local pid=$!
+    
+    echo "$pid" > "/tmp/moodle_backup_${client_name}_pid"
+    
+    log_success "Backup iniciado con PID: $pid"
+    log_info "Para seguir el progreso: tail -f /tmp/mb_$client_name.log"
+    log_info "Para ver el estado: mb status"
+    
+    wait_for_enter
+}
+
+# Habilitar cron interactivamente
+enable_cron_interactive() {
+    echo -e "${CYAN}${BOLD}HABILITAR CRON PARA CLIENTE${NC}"
+    echo ""
+    
+    # Mostrar clientes disponibles
+    local configs=()
+    for config_file in "$CONFIG_DIR"/*.conf; do
+        if [[ -f "$config_file" ]]; then
+            local client_name=$(basename "$config_file" .conf)
+            configs+=("$client_name")
+        fi
+    done
+    
+    if [[ ${#configs[@]} -eq 0 ]]; then
+        log_warning "No hay configuraciones disponibles"
+        wait_for_enter
+        return 1
+    fi
+    
+    echo "Clientes disponibles:"
+    for i in "${!configs[@]}"; do
+        echo "  $((i + 1)). ${configs[i]}"
+    done
+    echo ""
+    
+    read -r -p "Seleccione cliente (1-${#configs[@]}): " selection
+    
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [[ "$selection" -lt 1 ]] || [[ "$selection" -gt ${#configs[@]} ]]; then
+        log_error "Selección inválida"
+        wait_for_enter
+        return 1
+    fi
+    
+    local client_name="${configs[$((selection - 1))]}"
+    enable_cron_for_client "$client_name"
+    wait_for_enter
+}
+
+# Deshabilitar cron interactivamente
+disable_cron_interactive() {
+    echo -e "${CYAN}${BOLD}DESHABILITAR CRON PARA CLIENTE${NC}"
+    echo ""
+    
+    # Mostrar clientes con cron habilitado
+    local enabled_clients=()
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    
+    if [[ -f "$cron_status_file" ]]; then
+        while IFS=: read -r client status schedule; do
+            if [[ "$status" == "enabled" ]]; then
+                enabled_clients+=("$client")
+            fi
+        done < "$cron_status_file"
+    fi
+    
+    if [[ ${#enabled_clients[@]} -eq 0 ]]; then
+        log_warning "No hay clientes con cron habilitado"
+        wait_for_enter
+        return 1
+    fi
+    
+    echo "Clientes con cron habilitado:"
+    for i in "${!enabled_clients[@]}"; do
+        echo "  $((i + 1)). ${enabled_clients[i]}"
+    done
+    echo ""
+    
+    read -r -p "Seleccione cliente (1-${#enabled_clients[@]}): " selection
+    
+    if ! [[ "$selection" =~ ^[0-9]+$ ]] || [[ "$selection" -lt 1 ]] || [[ "$selection" -gt ${#enabled_clients[@]} ]]; then
+        log_error "Selección inválida"
+        wait_for_enter
+        return 1
+    fi
+    
+    local client_name="${enabled_clients[$((selection - 1))]}"
+    disable_cron_for_client "$client_name"
+    wait_for_enter
+}
+
+# Función para habilitar cron
+enable_cron_for_client() {
+    local client_name="$1"
+    local config_file="$CONFIG_DIR/$client_name.conf"
+    
+    if [[ ! -f "$config_file" ]]; then
+        log_error "No se encontró configuración para: $client_name"
+        return 1
+    fi
+    
+    log_info "Habilitando cron para: $client_name"
+    
+    # Leer configuración de cron del archivo
+    local cron_frequency=$(grep "^CRON_FREQUENCY=" "$config_file" | cut -d'"' -f2)
+    local cron_hour=$(grep "^CRON_HOUR=" "$config_file" | cut -d'"' -f2)
+    
+    # Generar expresión cron
+    local cron_expression=""
+    case "$cron_frequency" in
+        "daily") cron_expression="0 $cron_hour * * *" ;;
+        "every_2_days") cron_expression="0 $cron_hour */2 * *" ;;
+        "weekly") cron_expression="0 $cron_hour * * 0" ;;
+        "biweekly") cron_expression="0 $cron_hour 1,15 * *" ;;
+        "monthly") cron_expression="0 $cron_hour 1 * *" ;;
+        *) cron_expression="$cron_frequency" ;;
+    esac
+    
+    # Comando del cron
+    local cron_command="CONFIG_FILE=$config_file $SCRIPT_FULL_PATH >/dev/null 2>&1"
+    local cron_line="$cron_expression $cron_command # Moodle Backup - $client_name"
+    
+    # Agregar al crontab
+    (crontab -l 2>/dev/null || echo "") | grep -v "# Moodle Backup - $client_name" | { cat; echo "$cron_line"; } | crontab -
+    
+    # Actualizar archivo de estado
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    if [[ -f "$cron_status_file" ]]; then
+        sed -i "/^$client_name:/d" "$cron_status_file"
+    fi
+    echo "$client_name:enabled:$cron_expression" >> "$cron_status_file"
+    
+    log_success "Cron habilitado para $client_name: $cron_expression"
+}
+
+# Función para deshabilitar cron
+disable_cron_for_client() {
+    local client_name="$1"
+    
+    log_info "Deshabilitando cron para: $client_name"
+    
+    # Remover del crontab
+    (crontab -l 2>/dev/null || echo "") | grep -v "# Moodle Backup - $client_name" | crontab -
+    
+    # Actualizar archivo de estado
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    if [[ -f "$cron_status_file" ]]; then
+        sed -i "/^$client_name:enabled:/c\\$client_name:disabled:" "$cron_status_file"
+    fi
+    
+    log_success "Cron deshabilitado para: $client_name"
+}
+
+# Mostrar estado de todos los clientes
+show_all_status() {
+    echo -e "${CYAN}${BOLD}ESTADO DE TODOS LOS CLIENTES${NC}"
+    echo ""
+    
+    if [[ ! -d "$CONFIG_DIR" ]]; then
+        log_warning "No se encontró directorio de configuraciones"
+        return 1
+    fi
+    
+    local found_any=false
+    
+    for config_file in "$CONFIG_DIR"/*.conf; do
+        if [[ -f "$config_file" ]]; then
+            found_any=true
+            local client_name=$(basename "$config_file" .conf)
+            local client_desc=$(grep "^CLIENT_DESCRIPTION=" "$config_file" | cut -d'"' -f2 2>/dev/null || echo "Sin descripción")
+            
+            echo -e "${GREEN}Cliente: $client_name${NC}"
+            echo "  Descripción: $client_desc"
+            
+            # Estado del cron
+            local cron_status_file="$CONFIG_DIR/.cron_status"
+            local cron_status="desconocido"
+            if [[ -f "$cron_status_file" ]]; then
+                cron_status=$(grep "^$client_name:" "$cron_status_file" | cut -d: -f2 2>/dev/null || echo "desconocido")
+            fi
+            
+            case "$cron_status" in
+                "enabled") echo -e "  Cron: ${GREEN}🟢 Habilitado${NC}" ;;
+                "disabled") echo -e "  Cron: ${RED}🔴 Deshabilitado${NC}" ;;
+                *) echo -e "  Cron: ${YELLOW}❓ Desconocido${NC}" ;;
+            esac
+            
+            # Verificar proceso en ejecución
+            local pid_file="/tmp/moodle_backup_${client_name}_pid"
+            if [[ -f "$pid_file" ]]; then
+                local pid=$(cat "$pid_file")
+                if ps -p "$pid" >/dev/null 2>&1; then
+                    echo -e "  Estado: ${BLUE}🔄 Ejecutándose (PID: $pid)${NC}"
+                else
+                    echo -e "  Estado: ${YELLOW}⏸️  Inactivo${NC}"
+                fi
+            else
+                echo -e "  Estado: ${YELLOW}⏸️  Inactivo${NC}"
+            fi
+            
+            # Último log
+            local log_file=$(grep "^LOG_FILE=" "$config_file" | cut -d'"' -f2 2>/dev/null)
+            if [[ -f "$log_file" ]]; then
+                local last_backup=$(tail -n 20 "$log_file" | grep "BACKUP COMPLETADO" | tail -n 1 | cut -d' ' -f1-2)
+                if [[ -n "$last_backup" ]]; then
+                    echo "  Último backup: $last_backup"
+                else
+                    echo "  Último backup: No encontrado"
+                fi
+            else
+                echo "  Log: No disponible"
+            fi
+            
+            echo ""
+        fi
+    done
+    
+    if [[ "$found_any" != "true" ]]; then
+        log_warning "No se encontraron configuraciones de clientes"
+    fi
+}
+
+# Función para esperar Enter
+wait_for_enter() {
+    echo ""
+    read -r -p "Presiona Enter para continuar..."
+}
+
+# Mostrar logs recientes
+show_recent_logs() {
+    echo -e "${CYAN}${BOLD}LOGS RECIENTES${NC}"
+    echo ""
+    
+    # Preguntar de qué cliente mostrar logs
+    local configs=()
+    for config_file in "$CONFIG_DIR"/*.conf; do
+        if [[ -f "$config_file" ]]; then
+            configs+=($(basename "$config_file" .conf))
+        fi
+    done
+    
+    if [[ ${#configs[@]} -eq 0 ]]; then
+        log_warning "No hay configuraciones disponibles"
+        return 1
+    fi
+    
+    echo "Seleccione cliente:"
+    for i in "${!configs[@]}"; do
+        echo "  $((i + 1)). ${configs[i]}"
+    done
+    echo "  0. Todos los clientes"
+    echo ""
+    
+    read -r -p "Selección: " selection
+    
+    if [[ "$selection" == "0" ]]; then
+        # Mostrar logs de todos los clientes
+        for client in "${configs[@]}"; do
+            local config_file="$CONFIG_DIR/$client.conf"
+            local log_file=$(grep "^LOG_FILE=" "$config_file" | cut -d'"' -f2 2>/dev/null)
+            
+            echo -e "${GREEN}=== LOGS DE $client ===${NC}"
+            if [[ -f "$log_file" ]]; then
+                tail -n 10 "$log_file"
+            else
+                echo "No se encontró archivo de log"
+            fi
+            echo ""
+        done
+    else
+        if ! [[ "$selection" =~ ^[0-9]+$ ]] || [[ "$selection" -lt 1 ]] || [[ "$selection" -gt ${#configs[@]} ]]; then
+            log_error "Selección inválida"
+            return 1
+        fi
+        
+        local client_name="${configs[$((selection - 1))]}"
+        local config_file="$CONFIG_DIR/$client_name.conf"
+        local log_file=$(grep "^LOG_FILE=" "$config_file" | cut -d'"' -f2 2>/dev/null)
+        
+        echo -e "${GREEN}=== LOGS DE $client_name ===${NC}"
+        if [[ -f "$log_file" ]]; then
+            tail -n 30 "$log_file"
+            echo ""
+            log_info "Para seguimiento en tiempo real: tail -f $log_file"
+        else
+            log_warning "No se encontró archivo de log: $log_file"
+        fi
+    fi
+}
+
+# Mostrar ayuda completa
+show_full_help() {
+    cat << 'EOF'
+🚀 MOODLE BACKUP V3 - GESTOR MULTI-CLIENTE
 
 COMANDOS PRINCIPALES:
-  mb                    Ejecutar backup en segundo plano (recomendado)
-  mb interactive        Ejecutar backup en primer plano (modo interactivo)
-  mb config             Ver configuración actual
-  mb test               Probar conectividad y configuración
-  mb help               Ver ayuda completa del script principal
-  mb diagnose           Diagnóstico del sistema
-  mb version            Ver versión del sistema
+  mb                    Menú interactivo de selección de clientes
+  mb list               Listar todas las configuraciones disponibles
+  mb on <cliente>       Habilitar cron para un cliente específico
+  mb off <cliente>      Deshabilitar cron para un cliente específico
+  mb status             Ver estado de todos los clientes
+  mb logs               Ver logs recientes de un cliente
+  mb help               Mostrar esta ayuda
+
+EJEMPLOS DE USO:
+  mb                    # Abrir menú interactivo
+  mb list               # Ver lista de clientes configurados
+  mb on cliente1        # Habilitar cron para cliente1
+  mb off cliente1       # Deshabilitar cron para cliente1
+  mb status             # Ver estado de todos los clientes
+
+GESTIÓN DE CRON:
+  • Los cron jobs se manejan individualmente por cliente
+  • Cada cliente puede tener diferentes horarios y frecuencias
+  • Use 'mb on/off' para habilitar/deshabilitar sin perder la configuración
+
+ARCHIVOS DE CONFIGURACIÓN:
+  • Ubicación: /etc/moodle-backup/configs/
+  • Un archivo .conf por cliente
+  • Estado de cron en: .cron_status
+
+LOGS:
+  • Cada cliente tiene su propio archivo de log
+  • Ubicación definida en su configuración
+  • Use 'mb logs' para acceso rápido
+
+Para ayuda del script principal: CONFIG_FILE=<archivo> mb --help
+EOF
+}
+
+# Función principal
+main() {
+    # Buscar script principal
+    find_main_script
+    
+    # Verificar argumentos
+    if [[ $# -eq 0 ]]; then
+        # Menú interactivo en bucle
+        while true; do
+            show_main_menu
+        done
+    else
+        # Comandos directos
+        case "$1" in
+            "list")
+                print_menu_header
+                list_configurations
+                ;;
+            "on")
+                if [[ -n "$2" ]]; then
+                    enable_cron_for_client "$2"
+                else
+                    log_error "Debe especificar el nombre del cliente"
+                    echo "Uso: mb on <cliente>"
+                fi
+                ;;
+            "off")
+                if [[ -n "$2" ]]; then
+                    disable_cron_for_client "$2"
+                else
+                    log_error "Debe especificar el nombre del cliente"
+                    echo "Uso: mb off <cliente>"
+                fi
+                ;;
+            "status")
+                print_menu_header
+                show_all_status
+                ;;
+            "logs")
+                print_menu_header
+                show_recent_logs
+                ;;
+            "help"|"--help")
+                show_full_help
+                ;;
+            *)
+                # Pasar argumentos al script principal
+                CONFIG_FILE="${CONFIG_FILE:-}" "$SCRIPT_FULL_PATH" "$@"
+                ;;
+        esac
+    fi
+}
+
+# Ejecutar función principal
+main "$@"
 
 COMANDOS DE MONITOREO:
   mb status             Estado del último backup

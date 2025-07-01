@@ -1,6 +1,6 @@
 #!/bin/bash
 # ===================== INSTALADOR INTERACTIVO MOODLE BACKUP V3 =====================
-# Instalador automático desde GitHub con configuración asistida
+# Instalador automático desde GitHub con configuración asistida paso a paso
 # Autor: Sistema Moodle Backup
 # Ejecutar con: bash <(curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install-interactive.sh)
 # =====================================================================================
@@ -21,13 +21,20 @@ BOLD='\033[1m'
 # Variables globales
 GITHUB_REPO="https://raw.githubusercontent.com/gzlo/moodle-backup/main"
 INSTALL_DIR=""
-CONFIG_DIR=""
+CONFIG_DIR="/etc/moodle-backup/configs"
 SCRIPT_NAME="moodle-backup"
 DETECTED_PANEL=""
 GLOBAL_INSTALL=false
 SETUP_CRON=true
 SETUP_RCLONE=true
 MULTI_CLIENT=false
+
+# Variables del sistema detectado
+DETECTED_CPU_CORES=""
+DETECTED_RAM=""
+DETECTED_DISK_SPACE=""
+RECOMMENDED_COMPRESSION=""
+RECOMMENDED_THREADS=""
 
 # Funciones de logging con estilo
 print_header() {
@@ -48,658 +55,902 @@ log_step() { echo -e "${PURPLE}🔧 $*${NC}"; }
 log_question() { echo -e "${CYAN}❓ $*${NC}"; }
 
 # Función para pausar y continuar
-pause_continue() {
-    echo ""
-    echo -e "${CYAN}Presiona ENTER para continuar...${NC}"
+wait_continue() {
+    echo -e "${CYAN}Presiona Enter para continuar...${NC}"
     read -r
 }
 
-# Función para preguntar sí/no
-ask_yes_no() {
-    local question="$1"
-    local default="${2:-n}"
-    local response
+# Función para detectar capacidades del servidor
+detect_server_capabilities() {
+    log_step "Detectando capacidades del servidor..."
     
-    while true; do
-        if [[ "$default" == "y" ]]; then
-            echo -e "${CYAN}❓ $question [Y/n]: ${NC}\c"
-        else
-            echo -e "${CYAN}❓ $question [y/N]: ${NC}\c"
-        fi
-        
-        read -r response
-        response=${response:-$default}
-        
-        case "$response" in
-            [Yy]|[Yy][Ee][Ss]) return 0 ;;
-            [Nn]|[Nn][Oo]) return 1 ;;
-            *) echo -e "${RED}Por favor responde 'y' o 'n'${NC}" ;;
-        esac
-    done
+    # Detectar CPU
+    DETECTED_CPU_CORES=$(nproc 2>/dev/null || echo "2")
+    
+    # Detectar RAM (en GB)
+    DETECTED_RAM=$(free -g | awk '/^Mem:/{print $2}' 2>/dev/null || echo "2")
+    
+    # Detectar espacio en disco (en GB)
+    DETECTED_DISK_SPACE=$(df -BG / | awk 'NR==2{gsub(/G/, "", $4); print $4}' 2>/dev/null || echo "10")
+    
+    # Recomendar configuración basada en recursos
+    if [[ $DETECTED_CPU_CORES -ge 8 ]] && [[ $DETECTED_RAM -ge 8 ]]; then
+        RECOMMENDED_COMPRESSION=6
+        RECOMMENDED_THREADS=4
+        SERVER_TYPE="Alto rendimiento"
+    elif [[ $DETECTED_CPU_CORES -ge 4 ]] && [[ $DETECTED_RAM -ge 4 ]]; then
+        RECOMMENDED_COMPRESSION=3
+        RECOMMENDED_THREADS=2
+        SERVER_TYPE="Rendimiento medio"
+    else
+        RECOMMENDED_COMPRESSION=1
+        RECOMMENDED_THREADS=1
+        SERVER_TYPE="Recursos limitados"
+    fi
+    
+    echo ""
+    log_info "🖥️  Capacidades del servidor detectadas:"
+    echo -e "   • CPUs: ${GREEN}$DETECTED_CPU_CORES${NC} núcleos"
+    echo -e "   • RAM: ${GREEN}${DETECTED_RAM}GB${NC}"
+    echo -e "   • Espacio libre: ${GREEN}${DETECTED_DISK_SPACE}GB${NC}"
+    echo -e "   • Tipo de servidor: ${YELLOW}$SERVER_TYPE${NC}"
+    echo ""
+    log_success "Recomendaciones optimizadas:"
+    echo -e "   • Nivel de compresión: ${GREEN}$RECOMMENDED_COMPRESSION${NC} (1=rápido, 22=máxima compresión)"
+    echo -e "   • Threads concurrentes: ${GREEN}$RECOMMENDED_THREADS${NC}"
+    echo ""
 }
 
-# Función para input con valor por defecto
-ask_input() {
-    local question="$1"
+# Función para preguntar con valor por defecto
+ask_with_default() {
+    local prompt="$1"
     local default="$2"
-    local response
+    local variable_name="$3"
+    local description="$4"
     
-    echo -e "${CYAN}❓ $question${NC}"
+    echo ""
+    log_question "$description"
+    echo -e "${CYAN}$prompt${NC}"
+    
     if [[ -n "$default" ]]; then
-        echo -e "${CYAN}   (Por defecto: $default): ${NC}\c"
+        echo -e "${YELLOW}Valor por defecto: $default${NC}"
+        read -r -p "Ingrese valor (Enter para usar por defecto): " value
+        if [[ -z "$value" ]]; then
+            value="$default"
+        fi
     else
-        echo -e "${CYAN}   : ${NC}\c"
+        read -r -p "Ingrese valor: " value
+        while [[ -z "$value" ]]; do
+            log_warning "Este campo es obligatorio"
+            read -r -p "Ingrese valor: " value
+        done
     fi
     
-    read -r response
-    echo "${response:-$default}"
+    declare -g "$variable_name"="$value"
+    log_success "✓ $variable_name = $value"
 }
 
-# Función para seleccionar de una lista
-ask_select() {
-    local question="$1"
-    shift
-    local options=("$@")
-    local choice
+# Función para preguntar sí/no con valor por defecto
+ask_yes_no() {
+    local prompt="$1"
+    local default="$2"
+    local variable_name="$3"
     
-    echo -e "${CYAN}❓ $question${NC}"
-    for i in "${!options[@]}"; do
-        echo -e "${CYAN}   $((i+1))) ${options[i]}${NC}"
-    done
-    
-    while true; do
-        echo -e "${CYAN}   Selecciona [1-${#options[@]}]: ${NC}\c"
-        read -r choice
-        
-        if [[ "$choice" =~ ^[1-9][0-9]*$ ]] && [[ "$choice" -le "${#options[@]}" ]]; then
-            echo "${options[$((choice-1))]}"
-            return 0
-        else
-            echo -e "${RED}   Selección inválida. Elige entre 1 y ${#options[@]}${NC}"
-        fi
-    done
-}
-
-# Verificar privilegios y configurar directorios
-setup_installation_paths() {
-    log_step "Configurando rutas de instalación..."
-    
-    if [[ $EUID -eq 0 ]]; then
-        log_success "Ejecutando como root - Instalación global disponible"
-        INSTALL_DIR="/usr/local/bin"
-        CONFIG_DIR="/etc"
-        GLOBAL_INSTALL=true
+    local options
+    if [[ "$default" == "true" ]] || [[ "$default" == "y" ]]; then
+        options="[Y/n]"
+        default_char="y"
     else
-        log_warning "Ejecutando como usuario regular"
-        INSTALL_DIR="$HOME/bin"
-        CONFIG_DIR="$HOME"
-        GLOBAL_INSTALL=false
-        mkdir -p "$INSTALL_DIR"
-        
-        if ask_yes_no "¿Deseas intentar instalación global? (requiere sudo)" "n"; then
-            if sudo -n true 2>/dev/null; then
-                log_success "Permisos sudo verificados"
-                INSTALL_DIR="/usr/local/bin"
-                CONFIG_DIR="/etc"
-                GLOBAL_INSTALL=true
-            else
-                log_warning "No se puede usar sudo, continuando con instalación local"
-            fi
-        fi
+        options="[y/N]"
+        default_char="n"
     fi
     
-    log_info "Directorio de instalación: $INSTALL_DIR"
-    log_info "Directorio de configuración: $CONFIG_DIR"
-}
-
-# Detectar distribución Linux
-detect_distro() {
-    if [[ -f /etc/os-release ]]; then
-        . /etc/os-release
-        echo "$ID"
-    elif [[ -f /etc/redhat-release ]]; then
-        echo "rhel"
-    elif [[ -f /etc/debian_version ]]; then
-        echo "debian"
-    else
-        echo "unknown"
+    echo ""
+    read -r -p "$prompt $options: " answer
+    
+    if [[ -z "$answer" ]]; then
+        answer="$default_char"
     fi
-}
-
-# Instalar dependencias automáticamente
-install_dependencies() {
-    log_step "Verificando e instalando dependencias..."
     
-    local distro=$(detect_distro)
-    local missing_deps=()
-    local install_cmd=""
-    
-    # Verificar dependencias
-    for cmd in mysqldump tar zstd curl wget; do
-        if ! command -v "$cmd" >/dev/null 2>&1; then
-            missing_deps+=("$cmd")
-        fi
-    done
-    
-    # Configurar comando de instalación según distribución
-    case "$distro" in
-        "ubuntu"|"debian")
-            install_cmd="apt update && apt install -y"
-            # Mapear nombres de paquetes
-            missing_deps=("${missing_deps[@]//mysqldump/mysql-client}")
-            missing_deps=("${missing_deps[@]//zstd/zstd}")
-            ;;
-        "centos"|"rhel"|"fedora"|"amzn")
-            if command -v dnf >/dev/null 2>&1; then
-                install_cmd="dnf install -y"
-            else
-                install_cmd="yum install -y"
-            fi
-            # Mapear nombres de paquetes
-            missing_deps=("${missing_deps[@]//mysqldump/mysql}")
-            missing_deps=("${missing_deps[@]//zstd/zstd}")
+    case ${answer,,} in
+        y|yes|true)
+            declare -g "$variable_name"="true"
             ;;
         *)
-            log_warning "Distribución no reconocida, verificar dependencias manualmente"
+            declare -g "$variable_name"="false"
+            ;;
+    esac
+}
+
+# Función para validar email
+validate_email() {
+    local email="$1"
+    if [[ $email =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Función para configurar un cliente paso a paso
+configure_client_interactive() {
+    local client_number="$1"
+    
+    echo ""
+    echo -e "${BLUE}${BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║                         CONFIGURACIÓN CLIENTE #$client_number                          ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    # Variables de configuración del cliente
+    local CLIENT_NAME=""
+    local CLIENT_DESCRIPTION=""
+    local PANEL_TYPE=""
+    local REQUIRE_CONFIG=""
+    local DOMAIN_NAME=""
+    local AUTO_DETECT_AGGRESSIVE=""
+    local PANEL_USER=""
+    local WWW_DIR=""
+    local MOODLEDATA_DIR=""
+    local TMP_DIR=""
+    local DB_HOST=""
+    local DB_NAME=""
+    local DB_USER=""
+    local DB_PASS=""
+    local GDRIVE_REMOTE=""
+    local MAX_BACKUPS_GDRIVE=""
+    local FORCE_THREADS=""
+    local FORCE_COMPRESSION_LEVEL=""
+    local OPTIMIZED_HOURS=""
+    local CUSTOM_UPLOAD_TIMEOUT=""
+    local MAINTENANCE_TITLE=""
+    local LOG_FILE=""
+    local EXTENDED_DIAGNOSTICS=""
+    local NOTIFICATION_EMAILS_EXTRA=""
+    local CRON_HOUR=""
+    local CRON_FREQUENCY=""
+    
+    # SECCIÓN 1: CONFIGURACIÓN UNIVERSAL MULTI-PANEL
+    echo -e "${PURPLE}${BOLD}SECCIÓN 1: CONFIGURACIÓN UNIVERSAL MULTI-PANEL${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Tipo de panel de control del servidor:" \
+        "auto" \
+        "PANEL_TYPE" \
+        "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+    
+    ask_yes_no \
+        "¿Requerir configuración manual (recomendado: false para auto-detección)?" \
+        "false" \
+        "REQUIRE_CONFIG"
+    
+    ask_with_default \
+        "Nombre del dominio (ejemplo: moodle.ejemplo.com):" \
+        "" \
+        "DOMAIN_NAME" \
+        "Necesario para algunos paneles como Plesk. Opcional para otros."
+    
+    ask_yes_no \
+        "¿Activar búsqueda agresiva si no encuentra Moodle?" \
+        "true" \
+        "AUTO_DETECT_AGGRESSIVE"
+    
+    # SECCIÓN 2: IDENTIFICACIÓN DEL CLIENTE
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 2: IDENTIFICACIÓN DEL CLIENTE${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Nombre único del cliente (sin espacios, solo letras, números y guiones):" \
+        "cliente$client_number" \
+        "CLIENT_NAME" \
+        "Se usará en nombres de archivos y carpetas. Ejemplo: empresa_com, cliente1"
+    
+    ask_with_default \
+        "Descripción del cliente para logs y notificaciones:" \
+        "Moodle Backup - $CLIENT_NAME" \
+        "CLIENT_DESCRIPTION" \
+        "Descripción amigable que aparecerá en emails y logs"
+    
+    # SECCIÓN 3: CONFIGURACIÓN DEL SERVIDOR
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 3: CONFIGURACIÓN DEL SERVIDOR${NC}"
+    echo ""
+    
+    case "$PANEL_TYPE" in
+        "cpanel")
+            ask_with_default \
+                "Usuario de cPanel:" \
+                "" \
+                "PANEL_USER" \
+                "Nombre de usuario de la cuenta de cPanel"
+            ;;
+        "plesk")
+            ask_with_default \
+                "Usuario de Plesk (puede ser irrelevante en algunos casos):" \
+                "" \
+                "PANEL_USER" \
+                "Usuario o dominio en Plesk"
+            ;;
+        "directadmin")
+            ask_with_default \
+                "Usuario de DirectAdmin:" \
+                "" \
+                "PANEL_USER" \
+                "Nombre de usuario de DirectAdmin"
+            ;;
+        *)
+            ask_with_default \
+                "Usuario del sistema (opcional para auto-detección):" \
+                "" \
+                "PANEL_USER" \
+                "Usuario del sistema, se detectará automáticamente si se deja vacío"
             ;;
     esac
     
-    if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        log_warning "Dependencias faltantes: ${missing_deps[*]}"
-        
-        if [[ -n "$install_cmd" ]]; then
-            if ask_yes_no "¿Instalar dependencias automáticamente?" "y"; then
-                log_info "Instalando dependencias..."
-                if [[ "$GLOBAL_INSTALL" == true ]]; then
-                    eval "$install_cmd ${missing_deps[*]}"
-                else
-                    eval "sudo $install_cmd ${missing_deps[*]}"
-                fi
-                log_success "Dependencias instaladas"
-            else
-                log_warning "Instalar manualmente: $install_cmd ${missing_deps[*]}"
-            fi
-        fi
-    else
-        log_success "Todas las dependencias están instaladas"
-    fi
-}
-
-# Verificar/instalar rclone
-setup_rclone() {
-    log_step "Configurando rclone..."
+    ask_with_default \
+        "Directorio web de Moodle (vacío para auto-detección):" \
+        "" \
+        "WWW_DIR" \
+        "Ruta completa al directorio donde está instalado Moodle. Ejemplo: /home/usuario/public_html"
     
-    if ! command -v rclone >/dev/null 2>&1; then
-        log_warning "rclone no está instalado"
-        
-        if ask_yes_no "¿Instalar rclone automáticamente?" "y"; then
-            log_info "Descargando e instalando rclone..."
-            curl https://rclone.org/install.sh | bash
-            log_success "rclone instalado"
-        else
-            log_warning "Instalar rclone manualmente: https://rclone.org/downloads/"
-            SETUP_RCLONE=false
-            return
-        fi
-    fi
+    ask_with_default \
+        "Directorio de datos de Moodle (vacío para auto-detección):" \
+        "" \
+        "MOODLEDATA_DIR" \
+        "Ruta al directorio moodledata. Se detectará desde config.php si se deja vacío"
     
-    # Verificar configuración de Google Drive
-    if ! rclone listremotes | grep -q "gdrive:"; then
-        log_warning "rclone no está configurado para Google Drive"
+    ask_with_default \
+        "Directorio temporal para backups:" \
+        "/tmp/moodle_backup_$CLIENT_NAME" \
+        "TMP_DIR" \
+        "Debe tener suficiente espacio libre (al menos 2x el tamaño de Moodle + BD)"
+    
+    # SECCIÓN 4: CONFIGURACIÓN DE BASE DE DATOS
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 4: CONFIGURACIÓN DE BASE DE DATOS${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Host de la base de datos:" \
+        "localhost" \
+        "DB_HOST" \
+        "Normalmente 'localhost' para la mayoría de paneles"
+    
+    ask_with_default \
+        "Nombre de la base de datos (vacío para auto-detección):" \
+        "" \
+        "DB_NAME" \
+        "Se detectará desde config.php si se deja vacío"
+    
+    ask_with_default \
+        "Usuario de la base de datos (vacío para auto-detección):" \
+        "" \
+        "DB_USER" \
+        "Se detectará desde config.php si se deja vacío"
+    
+    echo ""
+    log_question "¿Desea configurar la contraseña de la base de datos ahora?"
+    log_info "OPCIONES DE SEGURIDAD (ordenadas por seguridad):"
+    echo "  1. Variable de entorno (MÁS SEGURO)"
+    echo "  2. Archivo protegido /etc/mysql/backup.pwd (RECOMENDADO)"
+    echo "  3. Ingresar ahora en texto plano (MENOS SEGURO)"
+    echo "  4. Auto-detectar desde config.php (RECOMENDADO)"
+    echo ""
+    read -r -p "Seleccione opción [1-4] (4 para auto-detección): " db_option
+    
+    case "$db_option" in
+        "1")
+            read -r -s -p "Ingrese la contraseña (se configurará como variable de entorno): " DB_PASS
+            echo ""
+            echo "export MYSQL_PASSWORD=\"$DB_PASS\"" >> ~/.bashrc
+            log_success "✓ Contraseña configurada como variable de entorno"
+            ;;
+        "2")
+            read -r -s -p "Ingrese la contraseña (se guardará en archivo protegido): " DB_PASS
+            echo ""
+            echo "$DB_PASS" | sudo tee /etc/mysql/backup.pwd > /dev/null
+            sudo chmod 600 /etc/mysql/backup.pwd
+            sudo chown root:root /etc/mysql/backup.pwd
+            log_success "✓ Contraseña guardada en /etc/mysql/backup.pwd"
+            ;;
+        "3")
+            read -r -s -p "Ingrese la contraseña (ADVERTENCIA: se guardará en texto plano): " DB_PASS
+            echo ""
+            log_warning "⚠️  La contraseña se guardará en texto plano en el archivo de configuración"
+            ;;
+        *)
+            DB_PASS=""
+            log_success "✓ Se auto-detectará desde config.php"
+            ;;
+    esac
+    
+    # SECCIÓN 5: CONFIGURACIÓN DE GOOGLE DRIVE
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 5: CONFIGURACIÓN DE GOOGLE DRIVE${NC}"
+    echo ""
+    
+    # Verificar si rclone está configurado
+    if command -v rclone &> /dev/null; then
+        echo "Remotos de rclone disponibles:"
+        rclone listremotes || echo "No hay remotos configurados"
+        echo ""
         
-        if ask_yes_no "¿Configurar Google Drive ahora?" "y"; then
-            log_info "Iniciando configuración de rclone..."
-            echo ""
-            echo -e "${YELLOW}INSTRUCCIONES PARA GOOGLE DRIVE:${NC}"
-            echo -e "${YELLOW}1. Selecciona: Google Drive (opción ~15)${NC}"
-            echo -e "${YELLOW}2. Nombre del remote: gdrive${NC}"
-            echo -e "${YELLOW}3. Usa configuración automática cuando se pregunte${NC}"
-            echo -e "${YELLOW}4. Autoriza en el navegador que se abrirá${NC}"
-            echo ""
-            pause_continue
-            
+        ask_yes_no \
+            "¿Desea configurar o reconfigurar rclone para Google Drive?" \
+            "false" \
+            "SETUP_RCLONE_NOW"
+        
+        if [[ "$SETUP_RCLONE_NOW" == "true" ]]; then
+            log_step "Iniciando configuración de rclone..."
             rclone config
-            
-            if rclone listremotes | grep -q "gdrive:"; then
-                log_success "Google Drive configurado correctamente"
-                # Probar conexión
-                if rclone lsd gdrive: >/dev/null 2>&1; then
-                    log_success "Conexión con Google Drive verificada"
-                else
-                    log_warning "Conexión con Google Drive falló, verificar configuración"
-                fi
-            else
-                log_warning "Google Drive no configurado, se puede configurar después"
-                SETUP_RCLONE=false
-            fi
-        else
-            SETUP_RCLONE=false
         fi
-    else
-        log_success "rclone ya está configurado para Google Drive"
         
-        # Verificar conexión
-        if rclone lsd gdrive: >/dev/null 2>&1; then
-            log_success "Conexión con Google Drive verificada"
-        else
-            log_warning "Problemas con la conexión a Google Drive"
-            if ask_yes_no "¿Reconfigurar Google Drive?" "y"; then
-                rclone config
+        ask_with_default \
+            "Remote de rclone para Google Drive (formato: nombre_remote:carpeta_destino):" \
+            "gdrive:moodle_backups_$CLIENT_NAME" \
+            "GDRIVE_REMOTE" \
+            "Ejemplo: gdrive:moodle_backups o drive:backups/moodle"
+    else
+        log_warning "rclone no está instalado. Se instalará durante el proceso."
+        GDRIVE_REMOTE="gdrive:moodle_backups_$CLIENT_NAME"
+        log_info "Se configurará por defecto: $GDRIVE_REMOTE"
+    fi
+    
+    ask_with_default \
+        "Número máximo de carpetas de backup a mantener en Google Drive:" \
+        "3" \
+        "MAX_BACKUPS_GDRIVE" \
+        "Cantidad de backups históricos a conservar (recomendado: 3-7)"
+    
+    # SECCIÓN 6: CONFIGURACIÓN DE RENDIMIENTO
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 6: CONFIGURACIÓN DE RENDIMIENTO${NC}"
+    echo ""
+    
+    log_info "Configuración recomendada basada en su servidor ($SERVER_TYPE):"
+    echo -e "   • Threads: ${GREEN}$RECOMMENDED_THREADS${NC}"
+    echo -e "   • Compresión: ${GREEN}$RECOMMENDED_COMPRESSION${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Número de threads a usar (0 = automático según horario):" \
+        "$RECOMMENDED_THREADS" \
+        "FORCE_THREADS" \
+        "Más threads = más rápido pero consume más CPU"
+    
+    ask_with_default \
+        "Nivel de compresión (1=rápido, 22=máxima compresión):" \
+        "$RECOMMENDED_COMPRESSION" \
+        "FORCE_COMPRESSION_LEVEL" \
+        "Nivel $RECOMMENDED_COMPRESSION es óptimo para su servidor"
+    
+    ask_with_default \
+        "Horario optimizado (formato HH-HH, 24h):" \
+        "02-08" \
+        "OPTIMIZED_HOURS" \
+        "Durante estas horas se usarán más recursos. Recomendado: horario nocturno"
+    
+    ask_with_default \
+        "Timeout personalizado para subidas (segundos, 0=automático):" \
+        "0" \
+        "CUSTOM_UPLOAD_TIMEOUT" \
+        "Útil para conexiones lentas. 0 = detección automática"
+    
+    # SECCIÓN 7: CONFIGURACIÓN DE MANTENIMIENTO
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 7: CONFIGURACIÓN DE MANTENIMIENTO${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Título de la página de mantenimiento:" \
+        "Mantenimiento - Moodle" \
+        "MAINTENANCE_TITLE" \
+        "Mensaje que verán los usuarios durante el backup"
+    
+    # SECCIÓN 8: CONFIGURACIÓN DE LOGGING
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 8: CONFIGURACIÓN DE LOGGING${NC}"
+    echo ""
+    
+    ask_with_default \
+        "Archivo de log:" \
+        "/var/log/moodle_backup_$CLIENT_NAME.log" \
+        "LOG_FILE" \
+        "Ubicación del archivo de log específico para este cliente"
+    
+    ask_yes_no \
+        "¿Activar diagnósticos extendidos?" \
+        "true" \
+        "EXTENDED_DIAGNOSTICS"
+    
+    # SECCIÓN 9: CONFIGURACIÓN DE NOTIFICACIONES (OBLIGATORIO)
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 9: CONFIGURACIÓN DE NOTIFICACIONES${NC}"
+    echo ""
+    
+    log_warning "⚠️  OBLIGATORIO: Debe configurar al menos un email"
+    
+    while true; do
+        read -r -p "Ingrese email(s) para notificaciones (separados por comas): " NOTIFICATION_EMAILS_EXTRA
+        
+        if [[ -z "$NOTIFICATION_EMAILS_EXTRA" ]]; then
+            log_error "El email es obligatorio para recibir notificaciones de backup"
+            continue
+        fi
+        
+        # Validar emails
+        valid_emails=true
+        IFS=',' read -ra EMAILS <<< "$NOTIFICATION_EMAILS_EXTRA"
+        for email in "${EMAILS[@]}"; do
+            email=$(echo "$email" | xargs) # Trim spaces
+            if ! validate_email "$email"; then
+                log_error "Email inválido: $email"
+                valid_emails=false
+                break
             fi
+        done
+        
+        if [[ "$valid_emails" == "true" ]]; then
+            log_success "✓ Emails configurados: $NOTIFICATION_EMAILS_EXTRA"
+            break
+        fi
+    done
+    
+    # SECCIÓN 10: CONFIGURACIÓN DE CRON
+    echo ""
+    echo -e "${PURPLE}${BOLD}SECCIÓN 10: CONFIGURACIÓN DE PROGRAMACIÓN (CRON)${NC}"
+    echo ""
+    
+    log_info "Configuración de la programación automática del backup:"
+    echo ""
+    echo "Opciones de frecuencia:"
+    echo "  1. Diario"
+    echo "  2. Cada 2 días"
+    echo "  3. Semanal (domingos)"
+    echo "  4. Quincenal (1° y 15 de cada mes)"
+    echo "  5. Mensual (día 1 de cada mes)"
+    echo "  6. Personalizado"
+    echo ""
+    
+    read -r -p "Seleccione frecuencia [1-6]: " freq_option
+    
+    case "$freq_option" in
+        "1")
+            CRON_FREQUENCY="daily"
+            ;;
+        "2")
+            CRON_FREQUENCY="every_2_days"
+            ;;
+        "3")
+            CRON_FREQUENCY="weekly"
+            ;;
+        "4")
+            CRON_FREQUENCY="biweekly"
+            ;;
+        "5")
+            CRON_FREQUENCY="monthly"
+            ;;
+        "6")
+            read -r -p "Ingrese expresión cron personalizada (ejemplo: 0 2 * * 0): " CRON_FREQUENCY
+            ;;
+        *)
+            CRON_FREQUENCY="daily"
+            log_info "Usando frecuencia por defecto: diaria"
+            ;;
+    esac
+    
+    ask_with_default \
+        "Hora de ejecución (0-23):" \
+        "2" \
+        "CRON_HOUR" \
+        "Hora en formato 24h. Recomendado: horario nocturno (2-6 AM)"
+    
+    # MOSTRAR RESUMEN DE CONFIGURACIÓN
+    echo ""
+    echo -e "${GREEN}${BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║                           RESUMEN DE CONFIGURACIÓN                          ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    
+    echo -e "${YELLOW}Cliente:${NC} $CLIENT_NAME"
+    echo -e "${YELLOW}Descripción:${NC} $CLIENT_DESCRIPTION"
+    echo -e "${YELLOW}Panel:${NC} $PANEL_TYPE"
+    echo -e "${YELLOW}Usuario:${NC} $PANEL_USER"
+    echo -e "${YELLOW}Dominio:${NC} $DOMAIN_NAME"
+    echo -e "${YELLOW}Directorio web:${NC} ${WWW_DIR:-'Auto-detectar'}"
+    echo -e "${YELLOW}Datos Moodle:${NC} ${MOODLEDATA_DIR:-'Auto-detectar'}"
+    echo -e "${YELLOW}Base de datos:${NC} ${DB_NAME:-'Auto-detectar'}@$DB_HOST"
+    echo -e "${YELLOW}Google Drive:${NC} $GDRIVE_REMOTE"
+    echo -e "${YELLOW}Max backups:${NC} $MAX_BACKUPS_GDRIVE"
+    echo -e "${YELLOW}Threads:${NC} $FORCE_THREADS"
+    echo -e "${YELLOW}Compresión:${NC} $FORCE_COMPRESSION_LEVEL"
+    echo -e "${YELLOW}Horario optimizado:${NC} $OPTIMIZED_HOURS"
+    echo -e "${YELLOW}Emails:${NC} $NOTIFICATION_EMAILS_EXTRA"
+    echo -e "${YELLOW}Frecuencia:${NC} $CRON_FREQUENCY"
+    echo -e "${YELLOW}Hora:${NC} ${CRON_HOUR}:00"
+    echo ""
+    
+    ask_yes_no \
+        "¿Confirma esta configuración?" \
+        "true" \
+        "CONFIRM_CONFIG"
+    
+    if [[ "$CONFIRM_CONFIG" != "true" ]]; then
+        log_warning "Configuración cancelada. Regresando al menú principal."
+        return 1
+    fi
+    
+    # GENERAR ARCHIVO DE CONFIGURACIÓN
+    local config_file="$CONFIG_DIR/$CLIENT_NAME.conf"
+    mkdir -p "$CONFIG_DIR"
+    
+    cat > "$config_file" << EOF
+# ===================== CONFIGURACIÓN MOODLE BACKUP V3 =====================
+# Cliente: $CLIENT_NAME
+# Generado automáticamente el: $(date)
+# =========================================================================
+
+# ===================== CONFIGURACIÓN UNIVERSAL MULTI-PANEL =====================
+PANEL_TYPE="$PANEL_TYPE"
+REQUIRE_CONFIG=$REQUIRE_CONFIG
+DOMAIN_NAME="$DOMAIN_NAME"
+AUTO_DETECT_AGGRESSIVE="$AUTO_DETECT_AGGRESSIVE"
+
+# ===================== IDENTIFICACIÓN DEL CLIENTE =====================
+CLIENT_NAME="$CLIENT_NAME"
+CLIENT_DESCRIPTION="$CLIENT_DESCRIPTION"
+
+# ===================== CONFIGURACIÓN DEL SERVIDOR =====================
+PANEL_USER="$PANEL_USER"
+WWW_DIR="$WWW_DIR"
+MOODLEDATA_DIR="$MOODLEDATA_DIR"
+TMP_DIR="$TMP_DIR"
+
+# ===================== CONFIGURACIÓN DE BASE DE DATOS =====================
+DB_HOST=$DB_HOST
+DB_NAME="$DB_NAME"
+DB_USER="$DB_USER"
+EOF
+
+    # Solo agregar contraseña si se configuró en texto plano
+    if [[ -n "$DB_PASS" ]] && [[ "$db_option" == "3" ]]; then
+        echo "DB_PASS=\"$DB_PASS\"" >> "$config_file"
+    fi
+
+    cat >> "$config_file" << EOF
+
+# ===================== CONFIGURACIÓN DE GOOGLE DRIVE =====================
+GDRIVE_REMOTE=$GDRIVE_REMOTE
+MAX_BACKUPS_GDRIVE=$MAX_BACKUPS_GDRIVE
+
+# ===================== CONFIGURACIÓN DE RENDIMIENTO =====================
+FORCE_THREADS=$FORCE_THREADS
+FORCE_COMPRESSION_LEVEL=$FORCE_COMPRESSION_LEVEL
+OPTIMIZED_HOURS="$OPTIMIZED_HOURS"
+CUSTOM_UPLOAD_TIMEOUT=$CUSTOM_UPLOAD_TIMEOUT
+
+# ===================== CONFIGURACIÓN DE MANTENIMIENTO =====================
+MAINTENANCE_TITLE="$MAINTENANCE_TITLE"
+
+# ===================== CONFIGURACIÓN DE LOGGING =====================
+LOG_FILE="$LOG_FILE"
+EXTENDED_DIAGNOSTICS=$EXTENDED_DIAGNOSTICS
+
+# ===================== CONFIGURACIÓN DE NOTIFICACIONES =====================
+NOTIFICATION_EMAILS_EXTRA="$NOTIFICATION_EMAILS_EXTRA"
+
+# ===================== CONFIGURACIÓN INTERNA =====================
+# Programación cron: $CRON_FREQUENCY a las $CRON_HOUR:00
+CRON_FREQUENCY="$CRON_FREQUENCY"
+CRON_HOUR="$CRON_HOUR"
+EOF
+
+    chmod 600 "$config_file"
+    log_success "✅ Configuración guardada en: $config_file"
+    
+    # CONFIGURAR CRON
+    configure_cron_for_client "$CLIENT_NAME" "$CRON_FREQUENCY" "$CRON_HOUR"
+    
+    echo ""
+    ask_yes_no \
+        "¿Desea agregar otra configuración de cliente?" \
+        "false" \
+        "ADD_ANOTHER_CLIENT"
+    
+    return 0
+}
+
+# Función para configurar cron para un cliente específico
+configure_cron_for_client() {
+    local client_name="$1"
+    local frequency="$2"
+    local hour="$3"
+    
+    log_step "Configurando cron para cliente: $client_name"
+    
+    # Generar la expresión cron según la frecuencia
+    local cron_expression=""
+    case "$frequency" in
+        "daily")
+            cron_expression="0 $hour * * *"
+            ;;
+        "every_2_days")
+            cron_expression="0 $hour */2 * *"
+            ;;
+        "weekly")
+            cron_expression="0 $hour * * 0"
+            ;;
+        "biweekly")
+            cron_expression="0 $hour 1,15 * *"
+            ;;
+        "monthly")
+            cron_expression="0 $hour 1 * *"
+            ;;
+        *)
+            cron_expression="$frequency"
+            ;;
+    esac
+    
+    # Comando del cron
+    local cron_command="CONFIG_FILE=$CONFIG_DIR/$client_name.conf $INSTALL_DIR/mb >/dev/null 2>&1"
+    local cron_line="$cron_expression $cron_command # Moodle Backup - $client_name"
+    
+    # Agregar al crontab
+    (crontab -l 2>/dev/null || echo "") | grep -v "# Moodle Backup - $client_name" | { cat; echo "$cron_line"; } | crontab -
+    
+    log_success "✅ Cron configurado para $client_name: $cron_expression"
+    
+    # Crear archivo de estado del cron
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    mkdir -p "$CONFIG_DIR"
+    echo "$client_name:enabled:$cron_expression" >> "$cron_status_file"
+}
+
+# Función para deshabilitar cron de un cliente
+disable_cron_for_client() {
+    local client_name="$1"
+    
+    log_step "Deshabilitando cron para cliente: $client_name"
+    
+    # Remover del crontab
+    (crontab -l 2>/dev/null || echo "") | grep -v "# Moodle Backup - $client_name" | crontab -
+    
+    # Actualizar archivo de estado
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    if [[ -f "$cron_status_file" ]]; then
+        sed -i "/^$client_name:enabled:/c\\$client_name:disabled:" "$cron_status_file"
+    fi
+    
+    log_success "✅ Cron deshabilitado para $client_name"
+}
+
+# Función para habilitar cron de un cliente
+enable_cron_for_client() {
+    local client_name="$1"
+    
+    log_step "Habilitando cron para cliente: $client_name"
+    
+    # Leer configuración del cliente
+    local config_file="$CONFIG_DIR/$client_name.conf"
+    if [[ ! -f "$config_file" ]]; then
+        log_error "No se encontró configuración para cliente: $client_name"
+        return 1
+    fi
+    
+    # Extraer configuración de cron del archivo
+    local cron_frequency=$(grep "^CRON_FREQUENCY=" "$config_file" | cut -d'"' -f2)
+    local cron_hour=$(grep "^CRON_HOUR=" "$config_file" | cut -d'"' -f2)
+    
+    # Reconfigurar cron
+    configure_cron_for_client "$client_name" "$cron_frequency" "$cron_hour"
+    
+    # Actualizar archivo de estado
+    local cron_status_file="$CONFIG_DIR/.cron_status"
+    if [[ -f "$cron_status_file" ]]; then
+        sed -i "/^$client_name:disabled:/c\\$client_name:enabled:" "$cron_status_file"
+    fi
+}
+
+# Función principal de instalación interactiva mejorada
+main_interactive_install() {
+    print_header
+    
+    echo ""
+    log_info "🚀 Bienvenido al instalador interactivo de Moodle Backup V3"
+    log_info "Este instalador le guiará paso a paso para configurar backups automáticos"
+    echo ""
+    
+    # Detectar capacidades del servidor
+    detect_server_capabilities
+    wait_continue
+    
+    # Configurar directorios
+    setup_directories
+    
+    # Instalar dependencias
+    install_dependencies
+    
+    # Descargar scripts
+    download_scripts
+    
+    # Configuración interactiva multi-cliente
+    local client_number=1
+    local continue_adding=true
+    
+    while [[ "$continue_adding" == "true" ]]; do
+        if configure_client_interactive "$client_number"; then
+            client_number=$((client_number + 1))
+            continue_adding="$ADD_ANOTHER_CLIENT"
+        else
+            continue_adding="false"
+        fi
+    done
+    
+    # Configurar rclone si es necesario
+    setup_rclone_if_needed
+    
+    # Mostrar resumen final
+    show_final_summary
+    
+    log_success "🎉 ¡Instalación completada exitosamente!"
+    echo ""
+    log_info "Comandos disponibles:"
+    echo "   mb                    - Ver menú de selección de clientes"
+    echo "   mb list               - Listar configuraciones disponibles"
+    echo "   mb on <cliente>       - Habilitar cron para un cliente"
+    echo "   mb off <cliente>      - Deshabilitar cron para un cliente"
+    echo "   mb status             - Ver estado de todos los clientes"
+    echo ""
+}
+
+# Función para configurar directorios
+setup_directories() {
+    log_step "Configurando directorios del sistema..."
+    
+    # Determinar directorio de instalación
+    if [[ $EUID -eq 0 ]]; then
+        INSTALL_DIR="/usr/local/bin"
+        GLOBAL_INSTALL=true
+    else
+        INSTALL_DIR="$HOME/bin"
+        mkdir -p "$INSTALL_DIR"
+        # Agregar al PATH si no está
+        if ! echo "$PATH" | grep -q "$INSTALL_DIR"; then
+            echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> ~/.bashrc
+            export PATH="$INSTALL_DIR:$PATH"
         fi
     fi
+    
+    # Crear directorio de configuraciones
+    mkdir -p "$CONFIG_DIR"
+    chmod 755 "$CONFIG_DIR"
+    
+    log_success "✅ Directorios configurados"
+    log_info "   • Instalación: $INSTALL_DIR"
+    log_info "   • Configuraciones: $CONFIG_DIR"
 }
 
-# Detectar panel de control
-detect_panel() {
-    log_step "Detectando panel de control..."
+# Función para instalar dependencias
+install_dependencies() {
+    log_step "Verificando e instalando dependencias..."
     
-    if [[ -d "/usr/local/cpanel" ]] || command -v whmapi1 >/dev/null 2>&1; then
-        DETECTED_PANEL="cpanel"
-        log_success "Detectado: cPanel/WHM"
-    elif [[ -d "/opt/psa" ]] || command -v plesk >/dev/null 2>&1; then
-        DETECTED_PANEL="plesk"
-        log_success "Detectado: Plesk"
-    elif [[ -d "/usr/local/directadmin" ]]; then
-        DETECTED_PANEL="directadmin"
-        log_success "Detectado: DirectAdmin"
-    elif [[ -d "/usr/local/vesta" ]] || [[ -d "/usr/local/hestia" ]]; then
-        DETECTED_PANEL="vestacp"
-        log_success "Detectado: VestaCP/HestiaCP"
-    elif [[ -d "/usr/local/ispconfig" ]]; then
-        DETECTED_PANEL="ispconfig"
-        log_success "Detectado: ISPConfig"
-    else
-        DETECTED_PANEL="manual"
-        log_warning "No se detectó panel específico - Servidor manual"
+    local missing_deps=()
+    
+    # Verificar dependencias
+    for dep in curl wget pv tar gzip; do
+        if ! command -v "$dep" &> /dev/null; then
+            missing_deps+=("$dep")
+        fi
+    done
+    
+    # Instalar dependencias faltantes
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_warning "Instalando dependencias: ${missing_deps[*]}"
+        
+        if command -v apt-get &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y "${missing_deps[@]}"
+        elif command -v yum &> /dev/null; then
+            sudo yum install -y "${missing_deps[@]}"
+        elif command -v dnf &> /dev/null; then
+            sudo dnf install -y "${missing_deps[@]}"
+        else
+            log_error "No se pudo detectar el gestor de paquetes del sistema"
+            log_warning "Por favor, instale manualmente: ${missing_deps[*]}"
+        fi
     fi
     
-    # Confirmar detección
-    local panels=("cpanel" "plesk" "directadmin" "vestacp" "ispconfig" "manual")
-    if ask_yes_no "¿Confirmar panel detectado: $DETECTED_PANEL?" "y"; then
-        log_success "Panel confirmado: $DETECTED_PANEL"
-    else
-        log_question "Seleccionar panel manualmente:"
-        DETECTED_PANEL=$(ask_select "Tipo de panel:" "${panels[@]}")
-        log_success "Panel seleccionado: $DETECTED_PANEL"
+    # Verificar rclone
+    if ! command -v rclone &> /dev/null; then
+        log_step "Instalando rclone..."
+        curl https://rclone.org/install.sh | sudo bash
     fi
+    
+    log_success "✅ Dependencias verificadas e instaladas"
 }
 
-# Descargar archivos desde GitHub
-download_files() {
-    log_step "Descargando archivos desde GitHub..."
+# Función para descargar scripts
+download_scripts() {
+    log_step "Descargando scripts desde GitHub..."
     
+    # Lista de archivos a descargar
     local files=(
         "moodle_backup.sh"
         "mb"
-        "moodle_backup.conf.example"
     )
     
-    local temp_dir=$(mktemp -d)
-    cd "$temp_dir"
-    
     for file in "${files[@]}"; do
-        log_info "Descargando: $file"
-        if curl -fsSL "$GITHUB_REPO/$file" -o "$file"; then
-            chmod +x "$file" 2>/dev/null || true
-            log_success "✓ $file descargado"
+        log_info "Descargando $file..."
+        if curl -fsSL "$GITHUB_REPO/$file" -o "$INSTALL_DIR/$file"; then
+            chmod +x "$INSTALL_DIR/$file"
+            log_success "✅ $file descargado"
         else
-            log_error "Error descargando $file"
+            log_error "❌ Error descargando $file"
             exit 1
         fi
     done
     
-    echo "$temp_dir"
+    log_success "✅ Scripts descargados e instalados"
 }
 
-# Configurar instalación básica
-configure_basic_setup() {
-    log_step "Configuración básica del cliente..."
+# Función para configurar rclone si es necesario
+setup_rclone_if_needed() {
+    if ! command -v rclone &> /dev/null; then
+        log_error "rclone no está disponible"
+        return 1
+    fi
     
-    local client_name hostname_clean
-    hostname_clean=$(hostname | tr '.' '_' | tr '-' '_')
-    
-    client_name=$(ask_input "Nombre del cliente (identificador único)" "cliente_$hostname_clean")
-    local client_desc=$(ask_input "Descripción del cliente" "Backup Moodle - $client_name")
-    
-    # Configurar email de notificación (OBLIGATORIO)
-    log_step "Configuración de notificaciones por email..."
-    echo -e "${YELLOW}⚠️  IMPORTANTE: El email de notificación es OBLIGATORIO${NC}"
-    echo -e "   Sin email configurado, el script no funcionará."
-    echo
-    
-    local notification_email=""
-    while [[ -z "$notification_email" ]]; do
-        notification_email=$(ask_input "Email para notificaciones (OBLIGATORIO)" "")
+    # Verificar si hay remotos configurados
+    if ! rclone listremotes | grep -q .; then
+        log_warning "No se encontraron remotos de rclone configurados"
+        ask_yes_no \
+            "¿Desea configurar rclone para Google Drive ahora?" \
+            "true" \
+            "CONFIGURE_RCLONE_NOW"
         
-        # Validar formato básico de email
-        if [[ ! "$notification_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
-            log_error "Email inválido. Por favor ingresa un email válido."
-            notification_email=""
-        fi
-    done
-    
-    log_success "Email configurado: $notification_email"
-    
-    # Preguntar sobre configuración multi-cliente
-    if ask_yes_no "¿Este servidor tendrá múltiples clientes Moodle?" "n"; then
-        MULTI_CLIENT=true
-        log_info "Configuración multi-cliente habilitada"
-        log_info "Podrás agregar más configuraciones después"
-    fi
-    
-    # Crear configuración inicial
-    local config_path="$CONFIG_DIR/moodle_backup.conf"
-    
-    cat > "$config_path" << EOF
-# ===================== CONFIGURACIÓN MOODLE BACKUP V3 =====================
-# Generado automáticamente por el instalador interactivo
-# Fecha: $(date)
-# Panel detectado: $DETECTED_PANEL
-# =========================================================================
-
-# ===================== CONFIGURACIÓN BÁSICA =====================
-CLIENT_NAME=$client_name
-CLIENT_DESCRIPTION="$client_desc"
-
-# ===================== CONFIGURACIÓN DEL PANEL =====================
-PANEL_TYPE=$DETECTED_PANEL
-REQUIRE_CONFIG=false  # Permitir auto-detección como complemento
-
-# ===================== CONFIGURACIÓN ESPECÍFICA =====================
-# Las siguientes variables se auto-detectarán si están vacías
-PANEL_USER=""        # Se auto-detecta desde \$USER
-WWW_DIR=""           # Se auto-detecta según el panel
-MOODLEDATA_DIR=""    # Se auto-detecta desde config.php
-DOMAIN_NAME=""       # Necesario para Plesk y DirectAdmin
-
-# ===================== CONFIGURACIÓN DE BACKUP =====================
-GDRIVE_REMOTE="gdrive:moodle_backups"
-TMP_DIR="/tmp/moodle_backup"
-MAX_BACKUPS_GDRIVE=2
-
-# ===================== CONFIGURACIÓN AVANZADA =====================
-AUTO_DETECT_AGGRESSIVE=true
-FORCE_THREADS=0
-FORCE_COMPRESSION_LEVEL=1
-OPTIMIZED_HOURS="02-08"
-
-# ===================== NOTIFICACIONES =====================
-NOTIFICATION_EMAILS_EXTRA="$notification_email"  # Email de notificación configurado
-
-# ===================== NOTAS =====================
-# - Ejecutar: mb-config para ver configuración actual
-# - Editar este archivo para personalizar configuración
-# - Ver ejemplos en: moodle_backup.conf.example
-EOF
-    
-    chmod 600 "$config_path"
-    if [[ "$GLOBAL_INSTALL" == true ]]; then
-        chown root:root "$config_path" 2>/dev/null || true
-    fi
-    
-    log_success "Configuración básica creada: $config_path"
-    
-    # Mostrar configuración específica por panel
-    case "$DETECTED_PANEL" in
-        "plesk"|"directadmin"|"vestacp")
-            local domain_name=$(ask_input "Nombre del dominio (opcional pero recomendado)" "")
-            if [[ -n "$domain_name" ]]; then
-                sed -i "s/DOMAIN_NAME=\"\"/DOMAIN_NAME=\"$domain_name\"/" "$config_path"
-                log_success "Dominio configurado: $domain_name"
-            fi
-            ;;
-    esac
-}
-
-# Configurar cron job
-setup_cron_job() {
-    if ! ask_yes_no "¿Configurar backup automático con cron?" "y"; then
-        SETUP_CRON=false
-        return
-    fi
-    
-    log_step "Configurando tarea cron..."
-    
-    # Opciones de horario
-    local schedule_options=(
-        "2:00 AM diario (recomendado)"
-        "3:00 AM diario"
-        "1:00 AM diario"
-        "Horario personalizado"
-        "No configurar ahora"
-    )
-    
-    local selected_schedule=$(ask_select "¿Cuándo ejecutar el backup?" "${schedule_options[@]}")
-    
-    local cron_time=""
-    case "$selected_schedule" in
-        "2:00 AM diario (recomendado)")
-            cron_time="0 2 * * *"
-            ;;
-        "3:00 AM diario")
-            cron_time="0 3 * * *"
-            ;;
-        "1:00 AM diario")
-            cron_time="0 1 * * *"
-            ;;
-        "Horario personalizado")
-            local hour=$(ask_input "Hora (0-23)" "2")
-            local minute=$(ask_input "Minuto (0-59)" "0")
-            cron_time="$minute $hour * * *"
-            ;;
-        "No configurar ahora")
-            SETUP_CRON=false
-            return
-            ;;
-    esac
-    
-    # Configurar cron
-    local cron_command="$INSTALL_DIR/$SCRIPT_NAME 2>&1 | logger -t moodle-backup"
-    local cron_entry="$cron_time $cron_command"
-    
-    if [[ "$GLOBAL_INSTALL" == true ]]; then
-        # Agregar a crontab de root
-        (crontab -l 2>/dev/null || true; echo "$cron_entry") | crontab -
-        log_success "Cron job configurado para root: $selected_schedule"
-    else
-        # Agregar a crontab del usuario
-        (crontab -l 2>/dev/null || true; echo "$cron_entry") | crontab -
-        log_success "Cron job configurado para usuario: $selected_schedule"
-    fi
-    
-    log_info "Comando cron: $cron_entry"
-}
-
-# Instalar archivos
-install_files() {
-    log_step "Instalando archivos..."
-    
-    local temp_dir="$1"
-    
-    # Instalar script principal
-    cp "$temp_dir/moodle_backup.sh" "$INSTALL_DIR/$SCRIPT_NAME"
-    chmod +x "$INSTALL_DIR/$SCRIPT_NAME"
-    log_success "Script principal instalado: $INSTALL_DIR/$SCRIPT_NAME"
-    
-    # Instalar wrapper
-    cp "$temp_dir/mb" "$INSTALL_DIR/mb"
-    chmod +x "$INSTALL_DIR/mb"
-    log_success "Wrapper instalado: $INSTALL_DIR/mb"
-    
-    # Instalar configuración de ejemplo
-    cp "$temp_dir/moodle_backup.conf.example" "$CONFIG_DIR/"
-    log_success "Configuración de ejemplo instalada: $CONFIG_DIR/moodle_backup.conf.example"
-    
-    # Configurar aliases
-    local bashrc_file="$HOME/.bashrc"
-    if [[ "$GLOBAL_INSTALL" == true ]] && [[ -f "/etc/bash.bashrc" ]]; then
-        bashrc_file="/etc/bash.bashrc"
-    fi
-    
-    if ! grep -q "# Moodle Backup V3 - Aliases" "$bashrc_file" 2>/dev/null; then
-        cat >> "$bashrc_file" << EOF
-
-# Moodle Backup V3 - Aliases (Instalado: $(date))
-alias mb='$INSTALL_DIR/mb'
-alias mb-config='$INSTALL_DIR/mb config'
-alias mb-test='$INSTALL_DIR/mb test'
-alias mb-help='$INSTALL_DIR/mb help'
-alias mb-diag='$INSTALL_DIR/mb diag'
-alias mb-status='$INSTALL_DIR/mb status'
-alias mb-logs='$INSTALL_DIR/mb logs'
-alias mb-clean='$INSTALL_DIR/mb clean'
-EOF
-        log_success "Aliases configurados en: $bashrc_file"
-    fi
-    
-    # Agregar al PATH si es instalación local
-    if [[ "$GLOBAL_INSTALL" == false ]]; then
-        if ! grep -q 'export PATH="$HOME/bin:$PATH"' "$HOME/.bashrc" 2>/dev/null; then
-            echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
-            log_success "Directorio ~/bin agregado al PATH"
+        if [[ "$CONFIGURE_RCLONE_NOW" == "true" ]]; then
+            log_step "Iniciando configuración de rclone..."
+            rclone config
         fi
     fi
-    
-    # Configurar permisos
-    if [[ "$GLOBAL_INSTALL" == true ]]; then
-        chown root:root "$INSTALL_DIR/$SCRIPT_NAME" "$INSTALL_DIR/mb" 2>/dev/null || true
-    fi
 }
 
-# Prueba final de la instalación
-test_installation() {
-    log_step "Probando instalación..."
-    
-    # Probar comando principal
-    if "$INSTALL_DIR/$SCRIPT_NAME" --help >/dev/null 2>&1; then
-        log_success "Script principal funciona correctamente"
-    else
-        log_error "Error en el script principal"
-        return 1
-    fi
-    
-    # Probar wrapper
-    if "$INSTALL_DIR/mb" version >/dev/null 2>&1; then
-        log_success "Wrapper funciona correctamente"
-    else
-        log_error "Error en el wrapper"
-        return 1
-    fi
-    
-    # Probar configuración
-    log_info "Probando configuración..."
-    "$INSTALL_DIR/mb" config 2>&1 | head -10
-    
-    log_success "🎉 Instalación completada exitosamente"
-}
-
-# Mostrar resumen final
+# Función para mostrar resumen final
 show_final_summary() {
     echo ""
-    echo -e "${GREEN}${BOLD}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}${BOLD}║                          INSTALACIÓN COMPLETADA                             ║${NC}"
-    echo -e "${GREEN}${BOLD}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
+    echo -e "${GREEN}${BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════════════════════╗"
+    echo "║                              INSTALACIÓN COMPLETADA                         ║"
+    echo "╚══════════════════════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
     
-    echo -e "${BLUE}📍 UBICACIONES DE ARCHIVOS:${NC}"
-    echo -e "  Script principal: ${YELLOW}$INSTALL_DIR/$SCRIPT_NAME${NC}"
-    echo -e "  Wrapper:         ${YELLOW}$INSTALL_DIR/mb${NC}"
-    echo -e "  Configuración:   ${YELLOW}$CONFIG_DIR/moodle_backup.conf${NC}"
-    echo ""
+    log_info "📁 Archivos instalados en: $INSTALL_DIR"
+    log_info "⚙️  Configuraciones en: $CONFIG_DIR"
     
-    echo -e "${BLUE}🚀 PRIMEROS PASOS:${NC}"
-    echo -e "  1. Recargar configuración: ${CYAN}source ~/.bashrc${NC}"
-    echo -e "  2. Ver configuración:      ${CYAN}mb-config${NC}"
-    echo -e "  3. Probar Google Drive:    ${CYAN}mb-test${NC}"
-    echo -e "  4. Ejecutar primer backup: ${CYAN}mb${NC}"
     echo ""
-    
-    echo -e "${BLUE}📋 COMANDOS DISPONIBLES:${NC}"
-    echo -e "  ${CYAN}mb${NC}           - Ejecutar backup"
-    echo -e "  ${CYAN}mb-config${NC}    - Ver configuración"
-    echo -e "  ${CYAN}mb-test${NC}      - Probar Google Drive"
-    echo -e "  ${CYAN}mb-help${NC}      - Ver ayuda completa"
-    echo -e "  ${CYAN}mb-diag${NC}      - Diagnóstico del sistema"
-    echo -e "  ${CYAN}mb-status${NC}    - Estado del último backup"
-    echo -e "  ${CYAN}mb-logs${NC}      - Ver logs recientes"
-    echo -e "  ${CYAN}mb-clean${NC}     - Limpiar archivos temporales"
-    echo ""
-    
-    if [[ "$SETUP_CRON" == true ]]; then
-        echo -e "${BLUE}⏰ BACKUP AUTOMÁTICO CONFIGURADO${NC}"
-        echo -e "  Los backups se ejecutarán automáticamente según el horario configurado"
-        echo ""
+    log_info "🔧 Clientes configurados:"
+    if [[ -d "$CONFIG_DIR" ]]; then
+        for config_file in "$CONFIG_DIR"/*.conf; do
+            if [[ -f "$config_file" ]]; then
+                local client_name=$(basename "$config_file" .conf)
+                local client_desc=$(grep "^CLIENT_DESCRIPTION=" "$config_file" | cut -d'"' -f2)
+                echo -e "   • ${GREEN}$client_name${NC}: $client_desc"
+            fi
+        done
     fi
     
-    if [[ "$MULTI_CLIENT" == true ]]; then
-        echo -e "${BLUE}🔧 CONFIGURACIÓN MULTI-CLIENTE:${NC}"
-        echo -e "  Para agregar más clientes:"
-        echo -e "  ${CYAN}cp $CONFIG_DIR/moodle_backup.conf $CONFIG_DIR/moodle_backup_cliente2.conf${NC}"
-        echo -e "  ${CYAN}nano $CONFIG_DIR/moodle_backup_cliente2.conf${NC}"
-        echo ""
-    fi
-    
-    echo -e "${BLUE}📞 SOPORTE:${NC}"
-    echo -e "  GitHub: ${CYAN}https://github.com/gzlo/moodle-backup${NC}"
-    echo -e "  Issues: ${CYAN}https://github.com/gzlo/moodle-backup/issues${NC}"
     echo ""
-    
-    if ask_yes_no "¿Deseas ejecutar una prueba completa ahora?" "y"; then
-        echo ""
-        log_step "Ejecutando prueba completa..."
-        source ~/.bashrc 2>/dev/null || true
-        export PATH="$INSTALL_DIR:$PATH"
-        "$INSTALL_DIR/mb" config
-    fi
-    
-    # Preguntar si necesita configuraciones adicionales
-    if ask_yes_no "¿Necesitas configurar otro cliente/instalación Moodle?" "n"; then
-        echo ""
-        log_info "Para configurar clientes adicionales:"
-        echo -e "  1. Copia la configuración: ${CYAN}cp $CONFIG_DIR/moodle_backup.conf $CONFIG_DIR/moodle_backup_cliente2.conf${NC}"
-        echo -e "  2. Edita el nuevo archivo: ${CYAN}nano $CONFIG_DIR/moodle_backup_cliente2.conf${NC}"
-        echo -e "  3. Cambia CLIENT_NAME y rutas específicas"
-        echo -e "  4. Ejecuta con configuración específica: ${CYAN}CLIENT_NAME=cliente2 mb${NC}"
-    fi
+    log_info "📅 Tareas cron programadas:"
+    crontab -l | grep "Moodle Backup" || log_warning "No hay tareas cron configuradas"
 }
 
 # Función principal
 main() {
-    print_header
-    
-    echo -e "${BLUE}Este instalador configurará Moodle Backup V3 en tu servidor.${NC}"
-    echo -e "${BLUE}Se detectará automáticamente el tipo de panel y configuración.${NC}"
-    echo ""
-    
-    if ! ask_yes_no "¿Continuar con la instalación?" "y"; then
-        log_info "Instalación cancelada por el usuario"
-        exit 0
-    fi
-    
-    echo ""
-    
-    # Pasos de instalación
-    setup_installation_paths
-    detect_panel
-    install_dependencies
-    setup_rclone
-    
-    local temp_dir
-    temp_dir=$(download_files)
-    
-    configure_basic_setup
-    install_files "$temp_dir"
-    setup_cron_job
-    
-    # Limpiar archivos temporales
-    rm -rf "$temp_dir"
-    
-    test_installation
-    show_final_summary
-    
-    echo -e "${GREEN}🎉 ¡Instalación completada exitosamente!${NC}"
-    echo -e "${BLUE}Reinicia tu sesión o ejecuta: ${CYAN}source ~/.bashrc${NC}"
+    main_interactive_install
 }
 
 # Verificar requisitos mínimos
@@ -708,5 +959,5 @@ if [[ "${BASH_VERSION%%.*}" -lt 4 ]]; then
     exit 1
 fi
 
-# Ejecutar instalador
+# Ejecutar instalador interactivo
 main "$@"

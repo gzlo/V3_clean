@@ -5,28 +5,129 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
-## [3.1.1] - 2025-07-01
+## [3.0.0] - 2025-07-01
 
-### 🛠️ Correcciones Críticas del Instalador Web
+### � LANZAMIENTO MAYOR: Sistema Multi-Cliente Completamente Renovado
 
-#### 🚨 Problema Resuelto: Error "N: command not found"
-- **Bug Crítico**: Error `-bash: N: command not found` durante instalación desde tubería (curl | bash)
-- **Causa**: Conflicto de entrada estándar cuando el script se ejecuta con `curl | bash`
-- **Impacto**: Instalación fallaba al responder "N" a preguntas de configuración
+#### ✨ Instalación Interactiva Paso a Paso
+- **Nueva experiencia de instalación**: Configuración guiada completamente interactiva
+- **Detección automática de servidor**: CPU, RAM, espacio en disco y recomendaciones optimizadas
+- **Configuración por secciones**:
+  - Panel Multi-Universal (cPanel, Plesk, DirectAdmin, etc.)
+  - Identificación del cliente con validación
+  - Configuración del servidor con auto-detección
+  - Base de datos con manejo seguro de contraseñas
+  - Google Drive con verificación de rclone
+  - Rendimiento auto-optimizado
+  - Programación de cron flexible
+  - Notificaciones obligatorias con validación
 
-#### 🔧 Soluciones Implementadas
-- **Función `safe_read()`**: Nueva función para lectura segura de entrada usando `/dev/tty`
-- **Detección de Tubería**: Auto-detección de ejecución desde `curl | bash`
-- **Modo Auto Inteligente**: Activación automática del modo `--auto` desde tuberías
-- **Manejo Robusto**: Fallback a valores por defecto si falla la entrada
+#### 🎛️ Comando `mb` Completamente Renovado
+- **Menú interactivo multi-cliente**: Selección visual con estados en tiempo real
+- **Gestión numérica simple**: Ejecutar backups seleccionando 1, 2, 3...
+- **Estados visuales**: 🟢 Activo, 🔴 Inactivo para cada configuración
+- **Comandos intuitivos**:
+  - `mb` - Menú interactivo principal
+  - `mb on <cliente>` - Habilitar cron
+  - `mb off <cliente>` - Deshabilitar cron
+  - `mb status` - Estado de todos los clientes
+  - `mb list` - Lista completa de configuraciones
+  - `mb logs` - Logs por cliente
 
-#### ✨ Mejoras en web-install.sh
+#### 🔐 Seguridad Mejorada Significativamente
+- **Contraseñas seguras**: Variables de entorno o archivos protegidos automáticamente
+- **Eliminación de texto plano**: Nunca almacena contraseñas en configuraciones
+- **Auto-detección desde config.php**: Extrae credenciales de forma segura
+- **Permisos restrictivos**: Archivos de configuración con permisos 600
+
+#### 📁 Gestión Multi-Cliente Avanzada
+- **Configuraciones independientes**: `/etc/moodle-backup/configs/cliente.conf`
+- **Logs separados**: Un archivo de log por cliente
+- **Cron individual**: Gestión independiente de programaciones
+- **Estados persistentes**: Mantiene configuración al habilitar/deshabilitar
+
+#### ⚡ Optimización Automática Inteligente
+- **Detección de recursos**: Análisis automático de CPU, RAM y disco
+- **Recomendaciones dinámicas**: Configuración óptima según servidor detectado
+- **Tipos de servidor**: Alto rendimiento, medio, recursos limitados
+- **Configuración adaptativa**: Threads y compresión según capacidades
+
+#### 🛠️ Nuevas Características del Instalador
+- **Validación en tiempo real**: Verificación de emails, rutas y configuraciones
+- **Confirmación de configuración**: Resumen completo antes de guardar
+- **Configuración de múltiples clientes**: En una sola sesión de instalación
+- **Configuración automática de cron**: Programación individual por cliente
+
+### 🔧 Mejoras Técnicas
+
+#### Arquitectura
+- **Modularización**: Separación clara de funciones por responsabilidad
+- **Gestión de estado**: Sistema robusto de tracking de configuraciones
+- **Manejo de errores**: Validación exhaustiva y recovery automático
+
+#### Interface de Usuario
+- **Colores y estilos**: Sistema visual mejorado para mejor UX
+- **Mensajes claros**: Logging informativo con iconos y colores
+- **Navegación intuitiva**: Flujo paso a paso sin confusión
+
+#### Compatibilidad
+- **Soporte completo multi-panel**: Todos los paneles con gestión multi-cliente
+- **Backward compatibility**: Migración automática desde versiones anteriores
+- **Detección mejorada**: Auto-detección más robusta de entornos
+
+### 📋 Flujo de Uso Renovado
+
+#### Antes (V2.x)
 ```bash
-# Nueva función de entrada segura
-safe_read() { ... }
+# Instalación compleja
+curl -fsSL ... | bash
+# Edición manual de archivos
+nano moodle_backup.conf
+# Comando simple
+mb
+```
 
-# Detección automática de tubería
-detect_pipe_execution() { ... }
+#### Ahora (V3.0)
+```bash
+# Instalación guiada
+bash <(curl -fsSL .../install-interactive.sh)
+# [Configuración paso a paso automática]
+# Gestión multi-cliente intuitiva
+mb                    # Menú interactivo
+mb on cliente1       # Habilitar cliente
+mb off cliente2      # Deshabilitar cliente
+mb status            # Estado de todos
+```
+
+### 🏆 Beneficios Clave
+
+#### Para Administradores
+- ✅ **Cero edición manual** de archivos de configuración
+- ✅ **Configuración guiada** completamente automatizada
+- ✅ **Optimización automática** según recursos del servidor
+- ✅ **Gestión visual** con estados en tiempo real
+
+#### Para Múltiples Clientes
+- ✅ **Un servidor, múltiples configuraciones** completamente independientes
+- ✅ **Gestión individual** por cliente sin afectar otros
+- ✅ **Logs organizados** y separados por cliente
+- ✅ **Programaciones personalizadas** y flexibles
+
+#### Para Seguridad
+- ✅ **Manejo seguro de credenciales** sin texto plano
+- ✅ **Permisos restrictivos** automáticos
+- ✅ **Validación robusta** de todas las entradas
+- ✅ **Auto-detección segura** desde archivos de configuración
+
+### 🔄 Migración desde V2.x
+
+El nuevo instalador detecta automáticamente:
+- Configuraciones existentes de versiones anteriores
+- Configuraciones de rclone ya establecidas
+- Programaciones de cron previas
+- Logs y estructura de archivos existente
+
+**Proceso de migración automatizado y sin pérdida de datos**
 
 # Todos los read() reemplazados por safe_read()
 safe_read response "¿Desea reconfigurar Google Drive? [y/N]: " "N"
@@ -329,7 +430,7 @@ mb --show-config      # Configuración con validación completa
 
 #### 🛠️ Mejoras Técnicas
 - **Logging Avanzado**: Sistema de logging granular con rotación automática
-- **Validación Robusta**: Validación exhaustiva de configuración y directorios
+- **Validación Exhaustiva**: Validación exhaustiva de configuración y directorios
 - **Recuperación Inteligente**: Manejo de fallos parciales y reintento granular
 - **Verificación de Integridad**: Validación individual por archivo
 - **Retención por Carpetas**: Gestión de backups por fecha en Google Drive
@@ -423,39 +524,50 @@ mb --show-config      # Configuración con validación completa
 
 ---
 
-## 🎯 Próximas Versiones
+## Historial de Versiones Anteriores
 
-### Planificado para v3.1.0
-- Soporte para bases de datos PostgreSQL
-- Backup incremental opcional
-- Interfaz web de monitoreo
-- Integración con webhooks
-- Soporte para múltiples proveedores de almacenamiento
+### [2.x] - 2024-2025
+- Sistema de backup básico multi-panel
+- Configuración manual requerida
+- Comando `mb` simple
+- Auto-detección básica de entornos
 
-### En Consideración
-- Backup de configuraciones de servidor
-- Restauración automática desde backups
-- Métricas y dashboards
-- Integración con sistemas de monitoreo (Zabbix, Nagios)
-- Soporte para Docker y Kubernetes
+### [1.x] - 2024
+- Sistema inicial de backup para Moodle
+- Configuración completamente manual
+- Soporte limitado de paneles
+- Scripts independientes
 
 ---
 
-## 📝 Notas de Versión
+## 📝 Notas de Desarrollo
 
-### Compatibilidad
-- **V3.x**: Compatible con todas las versiones de Moodle 3.9+
-- **Paneles**: cPanel, Plesk, DirectAdmin, VestaCP, HestiaCP, ISPConfig
-- **SO**: Ubuntu 18.04+, CentOS 7+, Debian 9+, RHEL 7+
+### Convenciones de Commit
+Este proyecto utiliza [Conventional Commits](https://conventionalcommits.org/) en español:
 
-### Migración desde Versiones Anteriores
-- **V2 → V3**: Migración automática con `install.sh --upgrade`
-- **V1 → V3**: Reconfiguración necesaria, usar `install-interactive.sh`
+- `feat(scope): nueva funcionalidad`
+- `fix(scope): corrección de errores`
+- `docs(scope): actualización de documentación`
+- `refactor(scope): refactorización de código`
+- `test(scope): pruebas`
+- `chore(scope): tareas de mantenimiento`
 
-### Dependencias
-- **Requeridas**: bash 4.0+, rclone 1.53+, zstd, mysql-client
-- **Opcionales**: cpanel-cli, plesk-cli, directadmin-tools
+### Versionado
+- **MAJOR**: Cambios incompatibles en la API/interfaz
+- **MINOR**: Nueva funcionalidad compatible hacia atrás
+- **PATCH**: Correcciones de errores compatibles
+
+### Roadmap
+- [ ] Dashboard web para gestión visual
+- [ ] Soporte para múltiples destinos de backup
+- [ ] Sistema de restore automatizado
+- [ ] Métricas y reportes avanzados
+- [ ] API REST para integración externa
 
 ---
 
-**Nota**: Para ver cambios detallados de cada versión, revisar los commits en el repositorio de GitHub.
+**¿Encontraste un bug o tienes una sugerencia?** 
+[Abre un issue en GitHub](https://github.com/gzlo/moodle-backup/issues) 🐛
+
+**¿Quieres contribuir?** 
+[Lee nuestra guía de contribución](CONTRIBUTING.md) 🤝
