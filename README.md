@@ -1,11 +1,11 @@
-# 🚀 Moodle Backup V3 - Sistema Universal de Backups
+# 🚀 Moodle Backup V3.1 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0.5-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
-Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección inteligente, sincronización con Google Drive y configuración universal. Diseñado para funcionar en cualquier entorno: desde hosting compartido hasta VPS dedicados.
+Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección inteligente, sincronización con Google Drive, verificación inteligente de procesos y configuración universal. Diseñado para funcionar en cualquier entorno: desde hosting compartido hasta VPS dedicados.
 
 ## ⚡ Instalación Rápida (1 línea)
 
@@ -38,6 +38,13 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install
 - **Rutas de Moodle**: Detecta automáticamente www y moodledata
 - **Configuración de BD**: Lee config.php para obtener credenciales
 - **Sistema Operativo**: Soporta CentOS/RHEL, Ubuntu/Debian, Fedora, Rocky Linux
+
+### 🛡️ **Verificación Inteligente de Procesos (V3.1)**
+
+- **Detección Avanzada**: Distingue entre procesos válidos y huérfanos/colgados
+- **Limpieza Automática**: Elimina automáticamente procesos >2 horas sin intervención manual
+- **Lockfiles Inteligentes**: Sistema robusto de lockfiles por cliente para entornos multi-cliente
+- **Manejo de Señales**: Limpieza automática al recibir señales de interrupción (Ctrl+C, SIGTERM, etc.)
 
 ### 🚀 **Instalación Universal**
 
@@ -96,6 +103,15 @@ mb config
 
 # Probar conectividad y configuración
 mb test
+
+# Diagnóstico completo del sistema
+mb diagnose
+
+# Ver estado de procesos y backups
+mb status
+
+# Ver logs recientes
+mb logs [número_líneas]
 
 # Ver ayuda completa
 mb help
@@ -436,30 +452,72 @@ OPTIMIZED_HOURS="02-08"          # Horas de menor carga
 0 3 * * * /usr/local/bin/moodle_backup.sh --config /etc/moodle_backup_cliente2.conf >/dev/null 2>&1
 ```
 
-## 🆕 Changelog V3
+## 🆕 Nuevas Características V3.1
 
-### ✨ Nuevas Características
+### 🔧 **Verificación Inteligente de Procesos**
 
-- **Instalador web**: Instalación directa desde GitHub con un comando
-- **Auto-detección mejorada**: Soporte para todos los paneles principales
-- **Multi-panel inteligente**: Configuración automática según el entorno
-- **Verificación post-instalación**: Comprueba que todo funcione correctamente
-- **Configuración asistida**: Wizard interactivo para primera configuración
-- **Gestión de dependencias**: Instalación automática de herramientas necesarias
+El sistema V3.1 incluye mejoras significativas en el manejo de procesos:
 
-### 🔧 Mejoras
+#### ❌ **Problema Resuelto**: 
+```
+[ERROR] Ya hay una instancia de backup ejecutándose (PID: 3601852)
+```
 
-- **Logging mejorado**: Más detallado y estructurado
-- **Gestión de errores**: Mejor manejo y recuperación de errores
-- **Performance**: Optimizaciones en compresión y transferencia
-- **Compatibilidad**: Mejor soporte para diferentes distribuciones Linux
+#### ✅ **Solución Implementada**:
+- **Verificación real de PIDs**: Comprueba si el proceso realmente existe y es válido
+- **Detección de antigüedad**: Procesos >2 horas se consideran colgados y se eliminan automáticamente  
+- **Limpieza de lockfiles huérfanos**: Elimina archivos de bloqueo de procesos inexistentes
+- **Manejo de señales**: Limpieza automática al interrumpir con Ctrl+C o señales del sistema
 
-### 🐛 Correcciones
+#### 🛡️ **Funcionalidades Anti-Cuelgue**:
+```bash
+# El sistema ahora hace automáticamente:
+1. Verifica si el PID del lockfile existe realmente
+2. Comprueba que corresponde al script de backup
+3. Evalúa la antigüedad (>2h = proceso colgado)
+4. Limpia automáticamente procesos problemáticos  
+5. Continúa con el backup normalmente
+```
 
-- Problemas de detección en hosting compartido
-- Errores de permisos en instalaciones de usuario
-- Compatibilidad con versiones antiguas de MySQL
-- Manejo de rutas con espacios y caracteres especiales
+#### 🔧 **Herramientas de Diagnóstico**:
+```bash
+# Diagnóstico mejorado con información de procesos
+mb diagnose
+
+# Ver procesos de backup activos
+./cleanup_processes.sh --status
+
+# Información detallada incluye:
+# - PIDs en ejecución y su antigüedad
+# - Estado de lockfiles (válidos/huérfanos)  
+# - Procesos colgados detectados
+# - Limpieza automática aplicada
+```
+
+#### ⚙️ **Multi-Cliente Mejorado**:
+```bash
+# Cada cliente tiene lockfiles independientes
+CLIENT_NAME=cliente1 mb        # ✅ Independiente
+CLIENT_NAME=cliente2 mb        # ✅ Independiente  
+CLIENT_NAME=cliente3 mb        # ✅ Independiente
+
+# Sin conflictos entre clientes múltiples
+# Limpieza específica por cliente
+# Verificación aislada por configuración
+```
+
+### 🛠️ Herramientas de Mantenimiento (V3.1)
+
+```bash
+# Verificar estado de procesos y lockfiles
+./cleanup_processes.sh --status
+
+# Limpieza forzada de procesos colgados
+./cleanup_processes.sh --force
+
+# Ver ayuda del script de limpieza
+./cleanup_processes.sh --help
+```
 
 ## 📞 Soporte
 

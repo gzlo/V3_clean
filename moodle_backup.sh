@@ -1296,13 +1296,10 @@ validate_environment() {
         fi
     fi
     
-    # Validar que el proceso no esté ya ejecutándose
+    # Validar que el proceso no esté ya ejecutándose (mejorado V3.1)
     local script_name="moodle_backup.sh"
-    local running_processes
-    running_processes=$(pgrep -f "$script_name" | grep -v $$ || true)
-    
-    if [[ -n "$running_processes" ]]; then
-        validation_errors+=("Ya hay una instancia de backup ejecutándose (PID: $running_processes)")
+    if ! validate_and_cleanup_running_processes; then
+        validation_errors+=("Ya hay una instancia de backup ejecutándose")
     fi
     
     # Validar memoria disponible (mínimo 1GB)
@@ -1407,6 +1404,41 @@ diagnose_issues() {
     # Verificar espacio en disco
     local available_space=$(df -h "$TMP_DIR" | awk 'NR==2 {print $4}')
     log_info "Espacio disponible en $TMP_DIR: $available_space"
+    
+    # Verificar procesos de backup en ejecución
+    log_info "=== VERIFICACIÓN DE PROCESOS ==="
+    local script_name="moodle_backup.sh"
+    local running_processes
+    running_processes=$(pgrep -f "$script_name" 2>/dev/null || true)
+    
+    if [[ -n "$running_processes" ]]; then
+        log_info "Procesos de backup encontrados:"
+        for pid in $running_processes; do
+            if kill -0 "$pid" 2>/dev/null; then
+                local process_info
+                process_info=$(ps -p "$pid" -o pid,ppid,lstart,etime,cmd 2>/dev/null || echo "PID $pid - información no disponible")
+                log_info "  $process_info"
+            fi
+        done
+    else
+        log_info "No hay procesos de backup ejecutándose"
+    fi
+    
+    # Verificar lockfiles
+    local process_lockfile="/tmp/moodle_backup_${CLIENT_NAME}.pid"
+    if [[ -f "$process_lockfile" ]]; then
+        local stored_pid
+        stored_pid=$(cat "$process_lockfile" 2>/dev/null || echo "corrupto")
+        log_info "Lockfile encontrado: $process_lockfile (PID: $stored_pid)"
+        
+        if [[ "$stored_pid" =~ ^[0-9]+$ ]] && kill -0 "$stored_pid" 2>/dev/null; then
+            log_info "  PID $stored_pid está vivo"
+        else
+            log_info "  PID $stored_pid no existe (lockfile huérfano)"
+        fi
+    else
+        log_info "No se encontró lockfile de procesos"
+    fi
     
     # Verificar rclone
     if ! test_rclone_connection; then
@@ -1710,7 +1742,7 @@ compress_independent_files() {
     # 2. Comprimir moodledata
     log_info "Comprimiendo moodledata.tar.zst..."
     if nice -n 5 ionice -c2 -n4 tar \
-        --warning=no-file-changed \
+        --warning=no-filechaged \
         --warning=no-file-removed \
         --ignore-failed-read \
         -I "zstd -$ZSTD_LEVEL --threads=$ZSTD_THREADS" \
@@ -2137,8 +2169,9 @@ cleanup_hybrid() {
     find /tmp -name "moodle_backup_session_*.log" -mtime +1 -delete 2>/dev/null || true
     find /tmp -name "snapshot_creation_*.log" -mtime +1 -delete 2>/dev/null || true
     
-    # Limpiar lock de logging
+    # Limpiar lock de logging y lockfile de procesos
     rm -f "$LOG_LOCK" 2>/dev/null || true
+    rm -f "/tmp/moodle_backup_${CLIENT_NAME}.pid" 2>/dev/null || true
     
     log_info "✅ Limpieza híbrida completada - Estructura preservada, archivos antiguos eliminados"
 }
@@ -2429,6 +2462,9 @@ EOF
 
 # ===================== FUNCIÓN PRINCIPAL =====================
 main() {
+    # Configurar manejo de señales para limpieza automática
+    setup_signal_handlers
+    
     # Validar configuración antes de comenzar el backup
     if ! validate_configuration; then
         echo "ERROR: Configuración inválida. Script abortado." >&2
@@ -2689,3 +2725,159 @@ case "${1:-}" in
         exit 1
         ;;
 esac
+
+# ===================== VALIDACIÓN Y LIMPIEZA DE PROCESOS (V3.1) =====================
+validate_and_cleanup_running_processes() {
+    local script_name="moodle_backup.sh"
+    local lockfile_base="/tmp/moodle_backup_${CLIENT_NAME}"
+    local process_lockfile="${lockfile_base}.pid"
+    local max_process_age=7200  # 2 horas en segundos
+    
+    log_info "Verificando procesos de backup en ejecución"
+    
+    # 1. Verificar lockfile existente
+    if [[ -f "$process_lockfile" ]]; then
+        local stored_pid
+        stored_pid=$(cat "$process_lockfile" 2>/dev/null || echo "")
+        
+        if [[ -n "$stored_pid" ]] && [[ "$stored_pid" =~ ^[0-9]+$ ]]; then
+            # Verificar si el PID realmente existe y es nuestro script
+            if kill -0 "$stored_pid" 2>/dev/null; then
+                local process_cmd
+                process_cmd=$(ps -p "$stored_pid" -o comm= 2>/dev/null || echo "")
+                local process_args
+                process_args=$(ps -p "$stored_pid" -o args= 2>/dev/null || echo "")
+                
+                if [[ "$process_args" == *"$script_name"* ]]; then
+                    # Verificar antigüedad del proceso
+                    local process_start
+                    process_start=$(ps -p "$stored_pid" -o lstart= 2>/dev/null || echo "")
+                    
+                    if [[ -n "$process_start" ]]; then
+                        local process_epoch
+                        process_epoch=$(date -d "$process_start" +%s 2>/dev/null || echo "0")
+                        local current_epoch
+                        current_epoch=$(date +%s)
+                        local process_age=$((current_epoch - process_epoch))
+                        
+                        if [[ $process_age -gt $max_process_age ]]; then
+                            log_warn "Proceso de backup muy antiguo (${process_age}s), eliminando PID $stored_pid"
+                            kill -TERM "$stored_pid" 2>/dev/null || true
+                            sleep 5
+                            if kill -0 "$stored_pid" 2>/dev/null; then
+                                log_warn "Proceso resistente, forzando eliminación"
+                                kill -KILL "$stored_pid" 2>/dev/null || true
+                            fi
+                            rm -f "$process_lockfile" 2>/dev/null || true
+                        else
+                            log_error "Proceso de backup válido ejecutándose (PID: $stored_pid, edad: ${process_age}s)"
+                            return 1
+                        fi
+                    else
+                        log_error "Proceso de backup ejecutándose (PID: $stored_pid)"
+                        return 1
+                    fi
+                else
+                    log_info "PID $stored_pid no corresponde a nuestro script, limpiando lockfile"
+                    rm -f "$process_lockfile" 2>/dev/null || true
+                fi
+            else
+                log_info "PID almacenado $stored_pid no existe, limpiando lockfile huérfano"
+                rm -f "$process_lockfile" 2>/dev/null || true
+            fi
+        else
+            log_info "Lockfile corrupto, eliminando"
+            rm -f "$process_lockfile" 2>/dev/null || true
+        fi
+    fi
+    
+    # 2. Buscar procesos por comando (backup de verificación)
+    local running_processes
+    running_processes=$(pgrep -f "$script_name" | grep -v $$ 2>/dev/null || true)
+    
+    if [[ -n "$running_processes" ]]; then
+        log_info "Encontrados procesos candidatos: $running_processes"
+        
+        # Verificar cada proceso encontrado
+        for pid in $running_processes; do
+            if kill -0 "$pid" 2>/dev/null; then
+                local process_args
+                process_args=$(ps -p "$pid" -o args= 2>/dev/null || echo "")
+                
+                if [[ "$process_args" == *"$script_name"* ]] && [[ "$process_args" != *"vi "* ]] && [[ "$process_args" != *"nano "* ]] && [[ "$process_args" != *"cat "* ]]; then
+                    # Verificar antigüedad
+                    local process_start
+                    process_start=$(ps -p "$pid" -o lstart= 2>/dev/null || echo "")
+                    
+                    if [[ -n "$process_start" ]]; then
+                        local process_epoch
+                        process_epoch=$(date -d "$process_start" +%s 2>/dev/null || echo "0")
+                        local current_epoch
+                        current_epoch=$(date +%s)
+                        local process_age=$((current_epoch - process_epoch))
+                        
+                        if [[ $process_age -gt $max_process_age ]]; then
+                            log_warn "Eliminando proceso de backup antiguo (PID: $pid, edad: ${process_age}s)"
+                            kill -TERM "$pid" 2>/dev/null || true
+                            sleep 3
+                            if kill -0 "$pid" 2>/dev/null; then
+                                kill -KILL "$pid" 2>/dev/null || true
+                            fi
+                        else
+                            log_error "Proceso de backup válido ejecutándose (PID: $pid, edad: ${process_age}s)"
+                            return 1
+                        fi
+                    else
+                        log_error "Proceso de backup ejecutándose (PID: $pid)"
+                        return 1
+                    fi
+                fi
+            fi
+        done
+    fi
+    
+    # 3. Crear nuevo lockfile con nuestro PID
+    echo $$ > "$process_lockfile" 2>/dev/null || {
+        log_warn "No se pudo crear lockfile, continuando sin él"
+    }
+    
+    # 4. Limpiar lockfiles antiguos de otros tipos
+    find /tmp -name "moodle_backup_${CLIENT_NAME}*.lock" -mtime +1 -delete 2>/dev/null || true
+    find /tmp -name "moodle_backup_session_${CLIENT_NAME}_*.log" -mtime +1 -delete 2>/dev/null || true
+    
+    log_info "✅ Verificación de procesos completada, continuando con backup"
+    return 0
+}
+
+# ===================== MANEJO DE SEÑALES PARA LIMPIEZA (V3.1) =====================
+setup_signal_handlers() {
+    # Función de limpieza al recibir señales de interrupción
+    cleanup_on_signal() {
+        local signal="$1"
+        log_warn "Recibida señal $signal, iniciando limpieza de emergencia"
+        
+        # Desactivar modo mantenimiento
+        disable_maintenance_mode 2>/dev/null || true
+        
+        # Limpiar lockfiles
+        rm -f "/tmp/moodle_backup_${CLIENT_NAME}.pid" 2>/dev/null || true
+        rm -f "$LOG_LOCK" 2>/dev/null || true
+        
+        # Limpiar snapshot si existe
+        if [[ -n "${SNAPSHOT_DIR:-}" ]] && [[ -d "$SNAPSHOT_DIR" ]]; then
+            rm -rf "$SNAPSHOT_DIR" 2>/dev/null || true
+        fi
+        
+        # Enviar notificación de interrupción
+        send_notification "INTERRUPTED" 2>/dev/null || true
+        
+        log_info "Limpieza de emergencia completada"
+        exit 130
+    }
+    
+    # Configurar traps para señales comunes
+    trap 'cleanup_on_signal SIGINT' INT
+    trap 'cleanup_on_signal SIGTERM' TERM
+    trap 'cleanup_on_signal SIGQUIT' QUIT
+    trap 'cleanup_on_signal SIGHUP' HUP
+}

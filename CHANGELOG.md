@@ -5,6 +5,73 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.1.0] - 2025-07-01
+
+### 🚀 MAJOR: Verificación Inteligente de Procesos y Limpieza Automática
+
+#### ✨ Nuevas Características Principales
+- **Verificación Inteligente de PIDs**: Función `validate_and_cleanup_running_processes()` que distingue entre procesos válidos y huérfanos
+- **Limpieza Automática**: Eliminación automática de procesos colgados (>2 horas) y lockfiles huérfanos  
+- **Manejo de Señales**: Sistema robusto de limpieza al recibir SIGINT, SIGTERM, SIGQUIT, SIGHUP
+- **Script de Utilidad**: Nuevo `cleanup_processes.sh` para limpieza manual y diagnóstico
+
+#### 🔧 Mejoras Técnicas
+- **Lockfiles por Cliente**: Sistema de lockfiles específicos usando `${CLIENT_NAME}` para isolación multi-cliente
+- **Verificación de Antigüedad**: Procesos >2 horas se consideran colgados y se eliminan automáticamente
+- **Diagnóstico Mejorado**: Información detallada de procesos, PIDs y estado de lockfiles
+- **Compatibilidad mb**: Integración perfecta con el sistema de gestión multi-cliente existente
+
+#### 🛡️ Resolución de Problemas
+- **Problema Resuelto**: Error `"Ya hay una instancia de backup ejecutándose (PID: XXXX)"` por procesos fantasma
+- **Causa Identificada**: Procesos anteriores no terminados correctamente + lockfiles huérfanos
+- **Solución Implementada**: Verificación inteligente que valida PIDs reales vs archivos obsoletos
+
+#### 🎯 Funciones Agregadas
+```bash
+# Nueva función principal
+validate_and_cleanup_running_processes()
+
+# Manejo de señales
+setup_signal_handlers()
+
+# Limpieza al interrumpir
+cleanup_on_signal()
+
+# Script independiente
+./cleanup_processes.sh [--status|--force|--help]
+```
+
+#### 💡 Beneficios Operacionales
+- **Automatización Completa**: No requiere intervención manual para procesos colgados
+- **Inteligencia**: Distingue procesos válidos de problemáticos usando antigüedad y validación real
+- **Multi-Cliente**: Funciona perfectamente con `mb` y múltiples configuraciones de cliente
+- **Robustez**: Previene problemas futuros con manejo adecuado de señales
+
+#### 🔄 Flujo Mejorado
+1. **Antes V3.0**: `pgrep` → encontrar proceso → ERROR y salida
+2. **Ahora V3.1**: Verificar lockfile → validar PID real → comprobar antigüedad → limpiar si es necesario → continuar
+
+#### ⚙️ Comandos de Uso
+```bash
+# Backup normal (con limpieza automática)
+./mb
+
+# Diagnóstico con información de procesos
+./mb diagnose
+
+# Limpieza manual si necesario
+./cleanup_processes.sh --status
+./cleanup_processes.sh --force
+
+# Ver estado de lockfiles y procesos
+./cleanup_processes.sh --status
+```
+
+#### 📦 Archivos Nuevos/Modificados
+- ✅ `moodle_backup.sh`: Funciones de verificación y manejo de señales
+- ✅ `cleanup_processes.sh`: Script de utilidad independiente
+- ✅ Integración completa con sistema `mb` multi-cliente
+
 ## [3.0.5] - 2025-07-01
 
 ### 🚀 Mayor Mejora: Ejecución en Segundo Plano
