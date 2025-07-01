@@ -123,6 +123,7 @@ print_banner() {
      ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     
                                                       
             INSTALADOR WEB UNIVERSAL V3
+                     by GZLOnline
 EOF
     echo -e "${NC}"
 }

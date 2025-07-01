@@ -39,8 +39,33 @@ log_info() { log "INFO" "$@"; }
 log_warn() { log "WARN" "$@"; }
 log_error() { log "ERROR" "$@"; }
 
+# Banner de bienvenida
+print_banner() {
+    echo -e "\033[0;35m"  # Color púrpura
+    cat << 'EOF'
+    ███╗   ███╗ ██████╗  ██████╗ ██████╗ ██╗     ███████╗
+    ████╗ ████║██╔═══██╗██╔═══██╗██╔══██╗██║     ██╔════╝
+    ██╔████╔██║██║   ██║██║   ██║██║  ██║██║     █████╗  
+    ██║╚██╔╝██║██║   ██║██║   ██║██║  ██║██║     ██╔══╝  
+    ██║ ╚═╝ ██║╚██████╔╝╚██████╔╝██████╔╝███████╗███████╗
+    ╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═════╝ ╚══════╝╚══════╝
+                                                          
+     ██████╗  █████╗  ██████╗██╗  ██╗██╗   ██╗██████╗ 
+     ██╔══██╗██╔══██╗██╔════╝██║ ██╔╝██║   ██║██╔══██╗
+     ██████╔╝███████║██║     █████╔╝ ██║   ██║██████╔╝
+     ██╔══██╗██╔══██║██║     ██╔═██╗ ██║   ██║██╔═══╝ 
+     ██████╔╝██║  ██║╚██████╗██║  ██╗╚██████╔╝██║     
+     ╚═════╝ ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝ ╚═════╝ ╚═╝     
+                                                      
+          LIMPIEZA DE PROCESOS V3
+                by GZLOnline
+EOF
+    echo -e "\033[0m"  # Reset color
+}
+
 # Función principal de limpieza
 cleanup_backup_processes() {
+    print_banner
     log_info "=== INICIANDO LIMPIEZA DE PROCESOS COLGADOS ==="
     
     local found_issues=false
@@ -313,6 +338,7 @@ case "${1:-}" in
         ;;
     "")
         # Ejecución normal
+        print_banner
         cleanup_backup_processes
         ;;
     *)
