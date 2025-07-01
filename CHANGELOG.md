@@ -5,6 +5,69 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.0.3] - 2025-07-01
+
+### 🐛 Corrección Crítica: Variables de Entorno Vacías
+
+#### 🔧 Problema Resuelto
+- **Variables Vacías en Producción**: Corregido problema crítico donde variables de entorno definidas pero vacías impedían la carga de configuración desde archivos
+- **Síntomas Solucionados**: 
+  - Variables mostraban `[]` en lugar de valores del archivo
+  - Mensajes "Variable ya definida por entorno" incorrectos
+  - Validaciones fallaban por variables requeridas vacías
+
+#### ✨ Mejoras Implementadas
+- **Función de Limpieza**: Nueva función `clean_empty_environment_variables()` que elimina variables problemáticas
+- **Lógica Robusta**: Mejorada validación en `load_configuration()` usando `declare -p` para verificación
+- **Orden Optimizado**: Secuencia corregida: limpia → carga archivo → aplica defaults
+- **Validación Mejorada**: Uso de `-v` para detectar variables realmente no definidas
+
+#### 🎯 Wrapper `mb` - Comandos Unificados
+Se ha unificado y limpiado completamente el wrapper `mb` con una convención clara:
+
+**Comandos Simples (sin dash)** - Para uso cotidiano:
+```bash
+mb                    # Ejecutar backup completo
+mb config             # Ver configuración actual
+mb test               # Probar conectividad
+mb help               # Ver ayuda completa
+mb diagnose           # Diagnóstico del sistema
+mb version            # Ver versión
+mb status             # Estado del último backup
+mb logs               # Ver logs recientes
+mb clean              # Limpiar archivos temporales
+```
+
+**Opciones Avanzadas (con dash)** - Para compatibilidad completa:
+```bash
+mb --help             # Ayuda completa con todas las opciones
+mb --diagnose         # Diagnósticos avanzados
+mb --test-rclone      # Prueba específica de Google Drive
+mb --show-config      # Configuración con validación completa
+```
+#### 🔧 Mejoras de Documentación
+- **README.md**: Actualizado con comandos unificados y convención clara
+- **Estructura Clara**: Separación entre comandos simples y opciones avanzadas
+- **Ejemplos Prácticos**: Incluidos ejemplos de uso común
+- **Limpieza de Código**: Eliminada duplicación de funciones en el wrapper
+
+#### 📁 Limpieza del Repositorio
+- **Archivos Sensibles**: Eliminados archivos de configuración con datos reales
+- **Archivos de Desarrollo**: Removidos scripts de prueba y validación temporal
+- **gitignore Mejorado**: Añadidos patrones para archivos sensibles y temporales
+
+### 🎯 Beneficios para la Comunidad
+- **Instalación Simplificada**: Comandos más intuitivos y fáciles de recordar
+- **Documentación Completa**: Guías claras para contribuidores y usuarios
+- **Código Limpio**: Eliminada redundancia y mejorada la estructura
+
+#### 🧪 Validación Completa
+- ✅ Variables vacías se limpian automáticamente
+- ✅ Configuración se carga desde archivo sin errores
+- ✅ No hay más mensajes "variable ya definida" incorrectos
+- ✅ Funciona en desarrollo y producción
+- ✅ Retrocompatible con configuraciones existentes
+
 ## [3.0.2] - 2025-07-01
 
 ### 🐛 Corrección de Errores

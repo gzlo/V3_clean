@@ -39,6 +39,29 @@ basic_log_error() { basic_log "ERROR" "$@"; }
 
 # ===================== SISTEMA DE CONFIGURACIÓN EXTERNA (V3 NUEVO) =====================
 
+# Función para limpiar variables de entorno vacías problemáticas
+clean_empty_environment_variables() {
+    local vars_to_clean=(
+        "CLIENT_NAME" "CLIENT_DESCRIPTION" "PANEL_TYPE" "REQUIRE_CONFIG"
+        "DB_PASS" "GDRIVE_REMOTE" "MAX_BACKUPS_GDRIVE" "TMP_DIR"
+        "CPANEL_USER" "WWW_DIR" "MOODLEDATA_DIR" "DB_NAME" "DB_USER"
+        "NOTIFICATION_EMAILS_EXTRA" "DB_HOST" "DOMAIN_NAME"
+    )
+    
+    basic_log_info "Limpiando variables de entorno vacías..."
+    
+    for var in "${vars_to_clean[@]}"; do
+        # Verificar si la variable está definida y si está vacía
+        if declare -p "$var" >/dev/null 2>&1; then
+            local current_value="${!var:-}"
+            if [[ -z "$current_value" ]]; then
+                unset "$var"
+                basic_log_info "Variable vacía eliminada: $var"
+            fi
+        fi
+    done
+}
+
 # Función para cargar configuración externa
 load_configuration() {
     local config_loaded=false
@@ -68,12 +91,14 @@ load_configuration() {
                     # Remover comillas si existen
                     value=$(echo "$value" | sed 's/^["\047]//' | sed 's/["\047]$//')
                     
-                    # Solo sobrescribir si la variable no está ya definida por entorno
-                    if [[ -z "${!key:-}" ]]; then
+                    # CORRECCIÓN: Verificar si la variable está definida Y tiene contenido
+                    if ! declare -p "$key" >/dev/null 2>&1 || [[ -z "${!key:-}" ]]; then
+                        # Variable no definida o vacía - usar valor del archivo
                         declare -g "$key"="$value"
                         basic_log_info "Configuración cargada: $key=${!key}"
                     else
-                        basic_log_info "Variable ya definida por entorno: $key"
+                        # Variable ya definida con valor - mantener la del entorno
+                        basic_log_info "Variable ya definida por entorno: $key (manteniendo valor existente)"
                     fi
                 fi
             done < <(grep -E '^[A-Z_][A-Z0-9_]*=' "$config_file" 2>/dev/null)
@@ -797,32 +822,33 @@ validate_configuration() {
 # ===================== CONFIGURACIÓN POR DEFECTO (FALLBACK) =====================
 set_default_configuration() {
     # Valores por defecto si no se cargan desde configuración externa
-    CLIENT_NAME="${CLIENT_NAME:-default}"
-    CLIENT_DESCRIPTION="${CLIENT_DESCRIPTION:-Moodle Backup}"
-    CPANEL_USER="${CPANEL_USER:-}"
-    WWW_DIR="${WWW_DIR:-}"
-    MOODLEDATA_DIR="${MOODLEDATA_DIR:-}"
-    DB_NAME="${DB_NAME:-}"
-    DB_USER="${DB_USER:-}"
-    DB_PASS="${DB_PASS:-${MYSQL_PASSWORD:-$(cat /etc/mysql/backup.pwd 2>/dev/null || echo '')}}"
-    TMP_DIR="${TMP_DIR:-/tmp/moodle_backup}"
-    GDRIVE_REMOTE="${GDRIVE_REMOTE:-gdrive:moodle_backups}"
-    LOG_FILE="${LOG_FILE:-/var/log/moodle_backup.log}"
-    MAX_BACKUPS_GDRIVE="${MAX_BACKUPS_GDRIVE:-2}"
-    FORCE_THREADS="${FORCE_THREADS:-0}"
-    FORCE_COMPRESSION_LEVEL="${FORCE_COMPRESSION_LEVEL:-1}"
-    OPTIMIZED_HOURS="${OPTIMIZED_HOURS:-02-08}"
-    CUSTOM_UPLOAD_TIMEOUT="${CUSTOM_UPLOAD_TIMEOUT:-0}"
-    MAINTENANCE_TITLE="${MAINTENANCE_TITLE:-Mantenimiento - Moodle}"
-    EXTENDED_DIAGNOSTICS="${EXTENDED_DIAGNOSTICS:-false}"
-    NOTIFICATION_EMAILS_EXTRA="${NOTIFICATION_EMAILS_EXTRA:-}"
+    # CORRECCIÓN: Solo establecer si NO están definidas o están vacías
+    [[ ! -v CLIENT_NAME || -z "${CLIENT_NAME:-}" ]] && CLIENT_NAME="default"
+    [[ ! -v CLIENT_DESCRIPTION || -z "${CLIENT_DESCRIPTION:-}" ]] && CLIENT_DESCRIPTION="Moodle Backup"
+    [[ ! -v CPANEL_USER || -z "${CPANEL_USER:-}" ]] && CPANEL_USER=""
+    [[ ! -v WWW_DIR || -z "${WWW_DIR:-}" ]] && WWW_DIR=""
+    [[ ! -v MOODLEDATA_DIR || -z "${MOODLEDATA_DIR:-}" ]] && MOODLEDATA_DIR=""
+    [[ ! -v DB_NAME || -z "${DB_NAME:-}" ]] && DB_NAME=""
+    [[ ! -v DB_USER || -z "${DB_USER:-}" ]] && DB_USER=""
+    [[ ! -v DB_PASS || -z "${DB_PASS:-}" ]] && DB_PASS="${MYSQL_PASSWORD:-$(cat /etc/mysql/backup.pwd 2>/dev/null || echo '')}"
+    [[ ! -v TMP_DIR || -z "${TMP_DIR:-}" ]] && TMP_DIR="/tmp/moodle_backup"
+    [[ ! -v GDRIVE_REMOTE || -z "${GDRIVE_REMOTE:-}" ]] && GDRIVE_REMOTE="gdrive:moodle_backups"
+    [[ ! -v LOG_FILE || -z "${LOG_FILE:-}" ]] && LOG_FILE="/var/log/moodle_backup.log"
+    [[ ! -v MAX_BACKUPS_GDRIVE || -z "${MAX_BACKUPS_GDRIVE:-}" ]] && MAX_BACKUPS_GDRIVE="2"
+    [[ ! -v FORCE_THREADS || -z "${FORCE_THREADS:-}" ]] && FORCE_THREADS="0"
+    [[ ! -v FORCE_COMPRESSION_LEVEL || -z "${FORCE_COMPRESSION_LEVEL:-}" ]] && FORCE_COMPRESSION_LEVEL="1"
+    [[ ! -v OPTIMIZED_HOURS || -z "${OPTIMIZED_HOURS:-}" ]] && OPTIMIZED_HOURS="02-08"
+    [[ ! -v CUSTOM_UPLOAD_TIMEOUT || -z "${CUSTOM_UPLOAD_TIMEOUT:-}" ]] && CUSTOM_UPLOAD_TIMEOUT="0"
+    [[ ! -v MAINTENANCE_TITLE || -z "${MAINTENANCE_TITLE:-}" ]] && MAINTENANCE_TITLE="Mantenimiento - Moodle"
+    [[ ! -v EXTENDED_DIAGNOSTICS || -z "${EXTENDED_DIAGNOSTICS:-}" ]] && EXTENDED_DIAGNOSTICS="false"
+    [[ ! -v NOTIFICATION_EMAILS_EXTRA || -z "${NOTIFICATION_EMAILS_EXTRA:-}" ]] && NOTIFICATION_EMAILS_EXTRA=""
     
     # NUEVAS VARIABLES PARA GESTIÓN UNIVERSAL
-    PANEL_TYPE="${PANEL_TYPE:-auto}"  # auto, cpanel, plesk, directadmin, vestacp, manual, none
-    REQUIRE_CONFIG="${REQUIRE_CONFIG:-true}"  # true para requerir configuración obligatoria (más seguro por defecto)
-    DOMAIN_NAME="${DOMAIN_NAME:-}"  # Necesario para algunos paneles (Plesk, etc.)
-    AUTO_DETECT_AGGRESSIVE="${AUTO_DETECT_AGGRESSIVE:-true}"  # Búsqueda agresiva en todo el sistema
-    DB_HOST="${DB_HOST:-localhost}"  # Host de base de datos por defecto
+    [[ ! -v PANEL_TYPE || -z "${PANEL_TYPE:-}" ]] && PANEL_TYPE="auto"  # auto, cpanel, plesk, directadmin, vestacp, manual, none
+    [[ ! -v REQUIRE_CONFIG || -z "${REQUIRE_CONFIG:-}" ]] && REQUIRE_CONFIG="false"  # Cambiar a false por defecto para permitir auto-detección
+    [[ ! -v DOMAIN_NAME || -z "${DOMAIN_NAME:-}" ]] && DOMAIN_NAME=""  # Necesario para algunos paneles (Plesk, etc.)
+    [[ ! -v AUTO_DETECT_AGGRESSIVE || -z "${AUTO_DETECT_AGGRESSIVE:-}" ]] && AUTO_DETECT_AGGRESSIVE="true"  # Búsqueda agresiva en todo el sistema
+    [[ ! -v DB_HOST || -z "${DB_HOST:-}" ]] && DB_HOST="localhost"  # Host de base de datos por defecto
 }
 
 # ===================== PROCESAMIENTO TEMPRANO DE ARGUMENTOS =====================
@@ -887,9 +913,10 @@ esac
 
 # ===================== VARIABLES PRINCIPALES (CONFIGURABLES) =====================
 
-# Cargar configuración en el orden correcto
-set_default_configuration
+# CORRECCIÓN: Limpiar variables vacías, cargar archivo, luego defaults como fallback
+clean_empty_environment_variables
 load_configuration
+set_default_configuration
 auto_detect_moodle_config
 process_email_configuration
 
