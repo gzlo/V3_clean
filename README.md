@@ -1,6 +1,6 @@
 # 🚀 Moodle Backup V3 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/tu-usuario/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
@@ -11,23 +11,23 @@ Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección 
 
 ```bash
 # Instalación automática desde GitHub (recomendado)
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash
 
 # O usando wget
-wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
+wget -qO- https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash
 ```
 
 ### 🔧 Instalación con Opciones
 
 ```bash
 # Instalación completamente automática (sin preguntas)
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto
+curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --auto
 
 # Instalación interactiva personalizada
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --interactive
+curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --interactive
 
 # Instalación omitiendo ciertas configuraciones
-curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
+curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
 ```
 
 ## 🎯 Características Principales
@@ -80,26 +80,55 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install
 
 ## 📋 Uso Básico
 
-Después de la instalación, el sistema se maneja con comandos simples:
+Después de la instalación, el sistema se maneja con el wrapper `mb` (MoodleBackup):
+
+### 🎮 Comandos Principales
 
 ```bash
-# Ejecutar backup inmediato
+# Ejecutar backup completo
 mb
 
-# Probar configuración
-mb --test
-
 # Ver configuración actual
-mb --show-config
+mb config
+
+# Probar conectividad y configuración
+mb test
 
 # Ver ayuda completa
-mb --help
+mb help
 
-# Ejecutar diagnósticos
-mb --diagnose
+# Ejecutar diagnósticos del sistema
+mb diagnose
 
-# Ver logs en tiempo real
-mb --follow-log
+# Ver versión del sistema
+mb version
+```
+
+**Convención de comandos:**
+- **Comandos simples** (sin dash): Para uso cotidiano - `mb config`, `mb test`, `mb help`
+- **Opciones avanzadas** (con dash): Para compatibilidad completa - `mb --help`, `mb --diagnose`, `mb --show-config`
+
+### 📊 Comandos de Monitoreo
+
+```bash
+# Ver logs recientes del último backup
+mb logs
+
+# Ver estado del último backup
+mb status
+
+# Limpiar archivos temporales antiguos
+mb clean
+```
+
+### 🔧 Comandos Avanzados (Compatibilidad)
+
+```bash
+# Opciones avanzadas con dash (compatibilidad completa)
+mb --help             # Ayuda completa con todas las opciones
+mb --diagnose         # Diagnósticos avanzados del sistema
+mb --test-rclone      # Prueba específica de Google Drive
+mb --show-config      # Configuración con validación completa
 ```
 
 ## ⚙️ Configuración Multi-Cliente

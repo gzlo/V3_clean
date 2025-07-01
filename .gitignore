@@ -1,45 +1,71 @@
+# ===================== MOODLE BACKUP V3 - GITIGNORE =====================
+
 # Archivos de configuración locales
 *.conf
 !*.conf.example
 
-# Logs
+# Logs y archivos de ejecución
 *.log
 logs/
+session_logs/
 
-# Archivos temporales
+# Archivos temporales y de backup
 *.tmp
 *.temp
 /tmp/
 moodle-backup-install-*/
-
-# Backups locales
 backups/
 *.sql
+*.sql.gz
 *.tar.gz
 *.tar.zst
+tmp_backup_*/
 
 # Archivos de sistema
 .DS_Store
 Thumbs.db
+.directory
 
 # Configuraciones de IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Archivos de prueba
+# Archivos de desarrollo y pruebas
 test_*
 prueba_*
+debug_*
+validate_*
 testing/
+dev/
 
-# Archivos sensibles
+# Archivos sensibles (por seguridad)
 *password*
 *secret*
 *key*
+*auth*
+credentials*
 
-# Archivos de configuración real (solo ejemplos)
-moodle_backup.conf
+# Configuraciones específicas de clientes
+client_configs/
+production.conf
+staging.conf
 
-# Directorios de trabajo temporal
-tmp_backup_*/
+# Archivos de instalación temporal
+install_*
+setup_*
+
+# Archivos de rclone (pueden contener tokens)
+rclone.conf
+
+# Variables de entorno locales
+.env
+.env.local
+.env.production
+
+# Archivos de base de datos
+*.db
+*.sqlite
+*.sqlite3

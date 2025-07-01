@@ -36,32 +36,41 @@ find_main_script() {
 # Mostrar ayuda del wrapper
 show_wrapper_help() {
     cat << 'EOF'
-=== MOODLE BACKUP V3 - COMANDOS RÁPIDOS ===
+🚀 MOODLE BACKUP V3 - WRAPPER SCRIPT
 
 USO: mb [COMANDO]
 
-COMANDOS DISPONIBLES:
+COMANDOS PRINCIPALES:
   mb                    Ejecutar backup completo
-  mb config             Ver configuración actual (--show-config)
-  mb test               Probar conexión Google Drive (--test-rclone)
-  mb help               Ver ayuda completa (--help)
-  mb diag               Diagnóstico del sistema (--diagnose)
-  mb version            Ver versión del script
-  mb status             Estado rápido del último backup
-  mb logs               Ver logs recientes
+  mb config             Ver configuración actual
+  mb test               Probar conectividad y configuración
+  mb help               Ver ayuda completa del script principal
+  mb diagnose           Diagnóstico del sistema
+  mb version            Ver versión del sistema
+
+COMANDOS DE MONITOREO:
+  mb status             Estado del último backup
+  mb logs               Ver logs recientes  
   mb clean              Limpiar archivos temporales antiguos
+
+OPCIONES AVANZADAS (compatibilidad completa):
+  mb --help             Ayuda completa con todas las opciones
+  mb --diagnose         Diagnósticos avanzados del sistema
+  mb --test-rclone      Prueba específica de Google Drive
+  mb --show-config      Configuración con validación completa
 
 EJEMPLOS:
   mb                    # Backup normal
   mb config             # Ver configuración
-  mb test               # Probar Google Drive
+  mb test               # Probar conectividad
+  mb logs               # Ver logs recientes
   
 CONFIGURACIÓN FLEXIBLE:
   PANEL_TYPE=plesk mb config          # Forzar tipo de panel
   REQUIRE_CONFIG=false mb config      # Permitir auto-detección
   CLIENT_NAME=test mb                 # Backup con nombre específico
 
-Para ayuda completa: mb help
+Para ayuda completa del script principal: mb help
 EOF
 }
 
@@ -146,53 +155,73 @@ main() {
     local command="${1:-run}"
     
     case "$command" in
+        # Comando por defecto - ejecutar backup
         ""|"run")
-            # Ejecutar backup normal
             exec "$SCRIPT_FULL_PATH"
             ;;
-        "config"|"show-config"|"--show-config")
-            # Ver configuración
+            
+        # Comandos simples del wrapper (sin dash)
+        "config")
             exec "$SCRIPT_FULL_PATH" --show-config
             ;;
-        "test"|"test-rclone"|"--test-rclone")
-            # Probar Google Drive
+        "test")
             exec "$SCRIPT_FULL_PATH" --test-rclone
             ;;
-        "help"|"--help"|"-h")
-            # Ver ayuda completa del script principal
+        "help")
             exec "$SCRIPT_FULL_PATH" --help
             ;;
-        "diag"|"diagnose"|"--diagnose")
-            # Diagnóstico del sistema
+        "diagnose")
             exec "$SCRIPT_FULL_PATH" --diagnose
             ;;
-        "version"|"--version")
-            # Mostrar versión
-            echo "Moodle Backup V3 - Script Universal Multi-Panel"
-            echo "Ubicación: $SCRIPT_FULL_PATH"
+        "version")
+            echo "🚀 Moodle Backup V3 - Script Universal Multi-Panel"
+            echo "📍 Ubicación: $SCRIPT_FULL_PATH"
             if [[ -f "$SCRIPT_FULL_PATH" ]]; then
-                grep "^# Fecha:" "$SCRIPT_FULL_PATH" | head -1
-                grep "^# Autor:" "$SCRIPT_FULL_PATH" | head -1
+                echo "📅 $(grep "^# Fecha:" "$SCRIPT_FULL_PATH" | head -1 || echo "Fecha: No especificada")"
+                echo "👤 $(grep "^# Autor:" "$SCRIPT_FULL_PATH" | head -1 || echo "Autor: Sistema Moodle Backup")"
+                echo "🔧 $(grep "^# Versión:" "$SCRIPT_FULL_PATH" | head -1 || echo "Versión: 3.0")"
             fi
             ;;
         "status")
-            # Mostrar estado del último backup
             show_backup_status
             ;;
         "logs")
-            # Mostrar logs recientes
             show_recent_logs
             ;;
         "clean")
-            # Limpiar archivos temporales
             clean_temp_files
             ;;
+            
+        # Opciones avanzadas (con dash para compatibilidad)
+        "--help"|"-h")
+            exec "$SCRIPT_FULL_PATH" --help
+            ;;
+        "--show-config")
+            exec "$SCRIPT_FULL_PATH" --show-config
+            ;;
+        "--test"|"--test-rclone")
+            exec "$SCRIPT_FULL_PATH" --test-rclone
+            ;;
+        "--diagnose")
+            exec "$SCRIPT_FULL_PATH" --diagnose
+            ;;
+        "--version")
+            echo "🚀 Moodle Backup V3 - Script Universal Multi-Panel"
+            echo "📍 Ubicación: $SCRIPT_FULL_PATH"
+            if [[ -f "$SCRIPT_FULL_PATH" ]]; then
+                echo "📅 $(grep "^# Fecha:" "$SCRIPT_FULL_PATH" | head -1 || echo "Fecha: No especificada")"
+                echo "👤 $(grep "^# Autor:" "$SCRIPT_FULL_PATH" | head -1 || echo "Autor: Sistema Moodle Backup")"
+                echo "🔧 $(grep "^# Versión:" "$SCRIPT_FULL_PATH" | head -1 || echo "Versión: 3.0")"
+            fi
+            ;;
+            
+        # Comandos especiales del wrapper
         "wrapper-help")
-            # Ayuda del wrapper
             show_wrapper_help
             ;;
+            
+        # Comando desconocido
         *)
-            # Comando desconocido, mostrar ayuda
             echo "❌ Comando desconocido: $command"
             echo ""
             show_wrapper_help
