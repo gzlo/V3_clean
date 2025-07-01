@@ -1243,6 +1243,93 @@ optimize_system_priority() {
 }
 
 # ===================== VERIFICACIÓN DE DEPENDENCIAS HÍBRIDA =====================
+# ===================== VALIDACIÓN DE ENTORNO =====================
+validate_environment() {
+    log_info "Validando entorno del sistema para backup"
+    
+    local validation_errors=()
+    
+    # Validar permisos de lectura en directorios críticos
+    if [[ -n "${WWW_DIR:-}" ]] && [[ -d "$WWW_DIR" ]]; then
+        if [[ ! -r "$WWW_DIR" ]]; then
+            validation_errors+=("Sin permisos de lectura en WWW_DIR: $WWW_DIR")
+        fi
+    fi
+    
+    if [[ -n "${MOODLEDATA_DIR:-}" ]] && [[ -d "$MOODLEDATA_DIR" ]]; then
+        if [[ ! -r "$MOODLEDATA_DIR" ]]; then
+            validation_errors+=("Sin permisos de lectura en MOODLEDATA_DIR: $MOODLEDATA_DIR")
+        fi
+    fi
+    
+    # Validar permisos de escritura en directorio temporal
+    if [[ -n "${TMP_DIR:-}" ]]; then
+        if ! mkdir -p "$TMP_DIR" 2>/dev/null; then
+            validation_errors+=("No se puede crear directorio temporal: $TMP_DIR")
+        elif [[ ! -w "$TMP_DIR" ]]; then
+            validation_errors+=("Sin permisos de escritura en TMP_DIR: $TMP_DIR")
+        fi
+    fi
+    
+    # Validar espacio disponible en disco (mínimo 2GB)
+    if [[ -n "${TMP_DIR:-}" ]] && [[ -d "$TMP_DIR" ]]; then
+        local available_space
+        available_space=$(df "$TMP_DIR" | awk 'NR==2 {print $4}')
+        local min_space_kb=$((2 * 1024 * 1024))  # 2GB en KB
+        
+        if [[ -n "$available_space" ]] && [[ "$available_space" -lt "$min_space_kb" ]]; then
+            local available_gb=$((available_space / 1024 / 1024))
+            validation_errors+=("Espacio insuficiente en disco: ${available_gb}GB disponible, mínimo 2GB requerido")
+        fi
+    fi
+    
+    # Validar conectividad de base de datos
+    if [[ -n "${DB_HOST:-}" ]] && [[ -n "${DB_USER:-}" ]] && [[ -n "${DB_NAME:-}" ]]; then
+        if command -v mysql >/dev/null 2>&1; then
+            local mysql_cmd="mysql -h${DB_HOST:-localhost} -u${DB_USER}"
+            [[ -n "${DB_PASS:-}" ]] && mysql_cmd+=" -p${DB_PASS}"
+            mysql_cmd+=" -e 'SELECT 1;' ${DB_NAME}"
+            
+            if ! eval "$mysql_cmd" >/dev/null 2>&1; then
+                validation_errors+=("No se puede conectar a la base de datos: ${DB_NAME}")
+            fi
+        fi
+    fi
+    
+    # Validar que el proceso no esté ya ejecutándose
+    local script_name="moodle_backup.sh"
+    local running_processes
+    running_processes=$(pgrep -f "$script_name" | grep -v $$ || true)
+    
+    if [[ -n "$running_processes" ]]; then
+        validation_errors+=("Ya hay una instancia de backup ejecutándose (PID: $running_processes)")
+    fi
+    
+    # Validar memoria disponible (mínimo 1GB)
+    if [[ -f /proc/meminfo ]]; then
+        local available_mem_kb
+        available_mem_kb=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo 2>/dev/null || echo "0")
+        local min_mem_kb=$((1024 * 1024))  # 1GB en KB
+        
+        if [[ "$available_mem_kb" -lt "$min_mem_kb" ]] && [[ "$available_mem_kb" -gt 0 ]]; then
+            local available_mem_gb=$((available_mem_kb / 1024 / 1024))
+            validation_errors+=("Memoria disponible baja: ${available_mem_gb}GB, recomendado mínimo 1GB")
+        fi
+    fi
+    
+    # Reportar errores si los hay
+    if [[ ${#validation_errors[@]} -gt 0 ]]; then
+        log_error "Errores de validación del entorno:"
+        for error in "${validation_errors[@]}"; do
+            log_error "  - $error"
+        done
+        return 1
+    fi
+    
+    log_info "✅ Validación del entorno completada exitosamente"
+    return 0
+}
+
 check_hybrid_dependencies() {
     log_info "Verificando dependencias del sistema (híbrido V1+V2)"
     
