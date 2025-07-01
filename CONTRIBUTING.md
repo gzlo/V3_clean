@@ -6,7 +6,7 @@
 
 ### 🐛 Reportar Errores
 
-1. **Busca primero** en los [issues existentes](https://github.com/tu-usuario/moodle-backup/issues)
+1. **Busca primero** en los [issues existentes](https://github.com/gzlo/moodle-backup/issues)
 2. **Usa el template** de reporte de errores
 3. **Incluye información del sistema**:
    - SO y versión

@@ -36,8 +36,8 @@ Este script:
 
 ```bash
 # Cualquiera de estos métodos
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/install.sh | bash
-wget -qO- https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
+wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
 ```
 
 ### 3️⃣ **DESPUÉS de reinstalar - Restaurar**

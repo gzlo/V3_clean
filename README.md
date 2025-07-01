@@ -1,6 +1,6 @@
 # 🚀 Moodle Backup V3 - Sistema Universal de Backups
 
-[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/tu-usuario/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.0.1-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
@@ -11,23 +11,23 @@ Sistema avanzado de backup para Moodle con soporte multi-panel, auto-detección 
 
 ```bash
 # Instalación automática desde GitHub (recomendado)
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
 
 # O usando wget
-wget -qO- https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash
+wget -qO- https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash
 ```
 
 ### 🔧 Instalación con Opciones
 
 ```bash
 # Instalación completamente automática (sin preguntas)
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --auto
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto
 
 # Instalación interactiva personalizada
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --interactive
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --interactive
 
 # Instalación omitiendo ciertas configuraciones
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/web-install.sh | bash -s -- --auto --skip-rclone --skip-cron
 ```
 
 ## 🎯 Características Principales
@@ -156,7 +156,7 @@ Los scripts de instalación **sobrescriben archivos principales** sin aviso. Par
 ./backup-before-reinstall.sh
 
 # 2. Reinstalar normalmente
-curl -fsSL https://raw.githubusercontent.com/tu-usuario/moodle-backup/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh | bash
 
 # 3. DESPUÉS de reinstalar - Restaurar configuraciones
 ~/moodle-backup-personal-XXXXXXXX/restore.sh
