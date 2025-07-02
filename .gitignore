@@ -1,5 +1,16 @@
 # ===================== MOODLE BACKUP V3 - GITIGNORE =====================
 
+# Tests y desarrollo - mantener directorio limpio en producción
+tests/
+!tests/README.md
+test-*.sh
+test-*.conf
+*.test
+*.test.*
+dev-*
+personal-*
+scratch.*
+
 # Archivos de configuración locales
 *.conf
 !*.conf.example
