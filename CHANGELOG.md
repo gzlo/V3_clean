@@ -5,6 +5,34 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.2.0] - 2025-07-02
+
+### 🐛 Correcciones Críticas
+
+#### ✅ Errores Solucionados
+- **Corregido error de tipeo**: `AUTO_DETECT_AGRESSIVE` → `AUTO_DETECT_AGGRESSIVE`
+- **Solucionado problema de scope de variables**: Eliminadas declaraciones `local` que impedían asignación correcta
+- **Arreglado script `mb`**: Eliminado contenido suelto que causaba loop infinito con error `COMANDOS: command not found`
+- **Corregida detección de paneles**: Eliminado `log_step` de `detect_control_panel()` que contaminaba el output
+- **Mejorada configuración de cron**: Agregadas validaciones para evitar formatos inválidos
+
+#### 🔧 Mejoras de Estabilidad
+- **Asignación dual de variables**: Método robusto usando `declare -g` + `eval` con verificación
+- **Validación de parámetros**: Verificación de `CLIENT_NAME`, `CRON_FREQUENCY` y `CRON_HOUR` antes de configurar cron
+- **Manejo de errores mejorado**: Mensajes más claros y descriptivos
+- **Función `show_wrapper_help()`**: Agregada función faltante en script `mb`
+
+#### 🧪 Verificaciones Agregadas
+- **Validación de sintaxis**: Verificación automática con `bash -n`
+- **Pruebas de asignación**: Script de prueba para verificar funcionamiento de variables
+- **Verificación de éxito**: Comprobación de que las variables se asignan correctamente
+
+#### 📋 Funcionalidad Corregida
+- **Resumen de configuración**: Ahora muestra todos los valores correctamente
+- **Archivos de configuración**: Se guardan con nombres válidos (CLIENT_NAME no vacío)
+- **Comando `mb`**: Funciona sin loops ni errores de comandos no encontrados
+- **Lista de configuraciones**: El comando `mb list` encuentra archivos correctamente
+
 ## [3.1.0] - 2025-07-01
 
 ### 🎯 Configuración Inteligente y Auto-Detección

@@ -1,38 +1,32 @@
 # 🚀 Moodle Backup V3 - Sistema Multi-Cliente Mejorado
 
-[![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
 Sistema avanzado de backup para Moodle con **configuración interactiva inteligente**, **auto-detección de paneles** y **lectura automática de config.php**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
 
-## 🆕 Novedades de la Versión 3.1
+## 🆕 Novedades de la Versión 3.2
 
-### 🎯 Configuración Inteligente y Auto-Detección
-- **Auto-detección de paneles** de control (cPanel, Plesk, DirectAdmin, VestaCP, ISPConfig)
-- **Lectura automática de config.php** para extraer configuración de base de datos
-- **Validación inteligente** de campos (dominio solo obligatorio para Plesk)
-- **Ejemplos dinámicos** de rutas según el panel detectado
-- **Extracción automática** de dominio desde la configuración de Moodle
+### 🐛 Correcciones Críticas
+- **Corregido error de tipeo** en variable `AUTO_DETECT_AGGRESSIVE`
+- **Solucionado problema de variables locales** que impedía asignación correcta
+- **Arreglado script `mb`** que generaba loop infinito por contenido mal ubicado
+- **Mejorada detección de paneles** eliminando output contaminado
+- **Validaciones robustas** para configuración de cron
 
-### ✨ Experiencia de Usuario Mejorada
-- **Interfaz más limpia** con menos emojis en preguntas
-- **Descripções más claras** para cada campo de configuración
-- **Valores predeterminados inteligentes** basados en configuración detectada
-- **Campos opcionales** claramente marcados
-- **Flujo de configuración optimizado** que reduce la entrada manual
+### ✨ Mejoras de Estabilidad
+- **Asignación dual de variables** usando `declare -g` y `eval` con verificación
+- **Validación de parámetros** antes de configurar tareas cron
+- **Manejo de errores mejorado** con mensajes más claros
+- **Verificación de sintaxis** automática antes de ejecución
 
-### 🔧 Mejoras Técnicas
-- **Detección automática** de capacidades del servidor (CPU, RAM, disco)
-- **Recomendaciones optimizadas** de rendimiento según recursos disponibles
-- **Gestión multi-cliente** desde la instalación
-- **Configuración guiada** con validación en tiempo real
-
-### 🔐 Seguridad Mejorada
-- **Contraseñas seguras**: Variables de entorno o archivos protegidos
-- **Auto-detección desde config.php** cuando es posible
-- **No almacenamiento en texto plano** en archivos de configuración
+### 🔧 Funcionalidad Corregida
+- **Resumen de configuración** ahora muestra valores correctamente
+- **Archivos de configuración** se guardan con nombres válidos
+- **Comando `mb`** funciona sin loops ni errores
+- **Detección automática** de paneles sin contaminar output
 
 ## ⚡ Instalación Rápida
 

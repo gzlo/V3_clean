@@ -153,8 +153,17 @@ ask_with_default() {
         fi
     fi
     
-    declare -g "$variable_name"="$value"
-    log_success "✓ $variable_name = $value"
+    # Método robusto para asignar variables - usar tanto declare como eval
+    declare -g "$variable_name"="$value" 2>/dev/null || true
+    eval "$variable_name=\"$value\""
+    
+    # Verificar que la asignación funcionó
+    if eval "test \"\${${variable_name}:-}\" = \"$value\""; then
+        log_success "✓ $variable_name = $value"
+    else
+        log_error "❌ Error al asignar $variable_name"
+        return 1
+    fi
 }
 
 # Función para preguntar sí/no con valor por defecto
@@ -179,14 +188,27 @@ ask_yes_no() {
         answer="$default_char"
     fi
     
+    local result_value
     case ${answer,,} in
         y|yes|true)
-            declare -g "$variable_name"="true"
+            result_value="true"
             ;;
         *)
-            declare -g "$variable_name"="false"
+            result_value="false"
             ;;
     esac
+    
+    # Método robusto para asignar variables
+    declare -g "$variable_name"="$result_value" 2>/dev/null || true
+    eval "$variable_name=\"$result_value\""
+    
+    # Verificar que la asignación funcionó
+    if eval "test \"\${${variable_name}:-}\" = \"$result_value\""; then
+        log_success "✓ $variable_name = $result_value"
+    else
+        log_error "❌ Error al asignar $variable_name"
+        return 1
+    fi
 }
 
 # Función para validar email
@@ -201,7 +223,7 @@ validate_email() {
 
 # Función para detectar automáticamente el tipo de panel
 detect_control_panel() {
-    log_step "Detectando tipo de panel de control..."
+    # Detectar silenciosamente - sin mostrar logs
     
     # Verificar cPanel
     if [[ -d "/usr/local/cpanel" ]] || [[ -f "/usr/local/cpanel/cpanel" ]]; then
@@ -335,38 +357,39 @@ configure_client_interactive() {
     echo -e "${NC}"
     
     # Variables de configuración del cliente
-    local CLIENT_NAME=""
-    local CLIENT_DESCRIPTION=""
-    local PANEL_TYPE=""
-    local REQUIRE_CONFIG=""
-    local DOMAIN_NAME=""
-    local AUTO_DETECT_AGGRESSIVE=""
-    local PANEL_USER=""
-    local WWW_DIR=""
-    local MOODLEDATA_DIR=""
-    local TMP_DIR=""
-    local DB_HOST=""
-    local DB_NAME=""
-    local DB_USER=""
-    local DB_PASS=""
-    local GDRIVE_REMOTE=""
-    local MAX_BACKUPS_GDRIVE=""
-    local FORCE_THREADS=""
-    local FORCE_COMPRESSION_LEVEL=""
-    local OPTIMIZED_HOURS=""
-    local CUSTOM_UPLOAD_TIMEOUT=""
-    local MAINTENANCE_TITLE=""
-    local LOG_FILE=""
-    local EXTENDED_DIAGNOSTICS=""
-    local NOTIFICATION_EMAILS_EXTRA=""
-    local CRON_HOUR=""
-    local CRON_FREQUENCY=""
+    CLIENT_NAME=""
+    CLIENT_DESCRIPTION=""
+    PANEL_TYPE=""
+    REQUIRE_CONFIG=""
+    DOMAIN_NAME=""
+    AUTO_DETECT_AGGRESSIVE=""
+    PANEL_USER=""
+    WWW_DIR=""
+    MOODLEDATA_DIR=""
+    TMP_DIR=""
+    DB_HOST=""
+    DB_NAME=""
+    DB_USER=""
+    DB_PASS=""
+    GDRIVE_REMOTE=""
+    MAX_BACKUPS_GDRIVE=""
+    FORCE_THREADS=""
+    FORCE_COMPRESSION_LEVEL=""
+    OPTIMIZED_HOURS=""
+    CUSTOM_UPLOAD_TIMEOUT=""
+    MAINTENANCE_TITLE=""
+    LOG_FILE=""
+    EXTENDED_DIAGNOSTICS=""
+    NOTIFICATION_EMAILS_EXTRA=""
+    CRON_HOUR=""
+    CRON_FREQUENCY=""
     
     # SECCIÓN 1: CONFIGURACIÓN UNIVERSAL MULTI-PANEL
     echo -e "${PURPLE}${BOLD}SECCIÓN 1: CONFIGURACIÓN UNIVERSAL MULTI-PANEL${NC}"
     echo ""
     
     # Auto-detectar panel primero
+    log_step "Detectando tipo de panel de control..."
     local detected_panel=$(detect_control_panel)
     if [[ "$detected_panel" != "manual" ]]; then
         log_success "Panel detectado automáticamente: $detected_panel"
@@ -843,7 +866,7 @@ configure_client_interactive() {
 PANEL_TYPE="$PANEL_TYPE"
 REQUIRE_CONFIG=$REQUIRE_CONFIG
 DOMAIN_NAME="$DOMAIN_NAME"
-AUTO_DETECT_AGGRESSIVE="$AUTO_DETECT_AGRESSIVE"
+AUTO_DETECT_AGGRESSIVE="$AUTO_DETECT_AGGRESSIVE"
 
 # ===================== IDENTIFICACIÓN DEL CLIENTE =====================
 CLIENT_NAME="$CLIENT_NAME"
@@ -897,8 +920,12 @@ EOF
     chmod 600 "$config_file"
     log_success "✅ Configuración guardada en: $config_file"
     
-    # CONFIGURAR CRON
-    configure_cron_for_client "$CLIENT_NAME" "$CRON_FREQUENCY" "$CRON_HOUR"
+    # CONFIGURAR CRON - Solo si CLIENT_NAME no está vacío
+    if [[ -n "$CLIENT_NAME" ]] && [[ -n "$CRON_FREQUENCY" ]] && [[ -n "$CRON_HOUR" ]]; then
+        configure_cron_for_client "$CLIENT_NAME" "$CRON_FREQUENCY" "$CRON_HOUR"
+    else
+        log_warning "⚠️ No se configuró cron: CLIENT_NAME='$CLIENT_NAME', CRON_FREQUENCY='$CRON_FREQUENCY', CRON_HOUR='$CRON_HOUR'"
+    fi
     
     echo ""
     ask_yes_no \
@@ -914,6 +941,22 @@ configure_cron_for_client() {
     local client_name="$1"
     local frequency="$2"
     local hour="$3"
+    
+    # Validar parámetros
+    if [[ -z "$client_name" ]]; then
+        log_error "❌ Error: client_name está vacío"
+        return 1
+    fi
+    
+    if [[ -z "$frequency" ]]; then
+        log_error "❌ Error: frequency está vacío"
+        return 1
+    fi
+    
+    if [[ -z "$hour" ]]; then
+        log_error "❌ Error: hour está vacío"
+        return 1
+    fi
     
     log_step "Configurando cron para cliente: $client_name"
     
