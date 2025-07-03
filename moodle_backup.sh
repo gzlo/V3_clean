@@ -849,23 +849,38 @@ auto_detect_database_config() {
     
     basic_log_info "Auto-detectando configuración de base de datos desde config.php"
     
+    # Usar función más robusta para extraer configuración
     # Solo auto-detectar si no están definidas
     if [[ -z "${DB_NAME:-}" ]]; then
-        if DB_NAME=$(grep -E "^\s*\\\$CFG->dbname\s*=" "${WWW_DIR}/config.php" | sed "s/.*=\s*['\"]//;s/['\"];.*//"); then
-            basic_log_info "Auto-detectado nombre BD: $DB_NAME"
+        if DB_NAME=$(grep -E "^\s*\\\$CFG->dbname\s*=" "${WWW_DIR}/config.php" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+            [[ -n "$DB_NAME" ]] && basic_log_info "Auto-detectado nombre BD: $DB_NAME"
         fi
     fi
     
     if [[ -z "${DB_USER:-}" ]]; then
-        if DB_USER=$(grep -E "^\s*\\\$CFG->dbuser\s*=" "${WWW_DIR}/config.php" | sed "s/.*=\s*['\"]//;s/['\"];.*//"); then
-            basic_log_info "Auto-detectado usuario BD: $DB_USER"
+        if DB_USER=$(grep -E "^\s*\\\$CFG->dbuser\s*=" "${WWW_DIR}/config.php" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+            [[ -n "$DB_USER" ]] && basic_log_info "Auto-detectado usuario BD: $DB_USER"
         fi
     fi
     
-    # Opcional: detectar host y puerto si no están definidos
+    # Detectar host si no está definido
     if [[ -z "${DB_HOST:-}" ]]; then
-        if DB_HOST=$(grep -E "^\s*\\\$CFG->dbhost\s*=" "${WWW_DIR}/config.php" | sed "s/.*=\s*['\"]//;s/['\"];.*//"); then
-            basic_log_info "Auto-detectado host BD: $DB_HOST"
+        if DB_HOST=$(grep -E "^\s*\\\$CFG->dbhost\s*=" "${WWW_DIR}/config.php" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+            [[ -n "$DB_HOST" ]] && basic_log_info "Auto-detectado host BD: $DB_HOST"
+        fi
+    fi
+    
+    # Detectar contraseña si no está definida (para mayor compatibilidad)
+    if [[ -z "${DB_PASS:-}" ]]; then
+        if DB_PASS=$(grep -E "^\s*\\\$CFG->dbpass\s*=" "${WWW_DIR}/config.php" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+            [[ -n "$DB_PASS" ]] && basic_log_info "Auto-detectada contraseña BD: [****]"
+        fi
+    fi
+    
+    # Detectar directorio de datos si no está definido
+    if [[ -z "${MOODLEDATA_DIR:-}" ]]; then
+        if MOODLEDATA_DIR=$(grep -E "^\s*\\\$CFG->dataroot\s*=" "${WWW_DIR}/config.php" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+            [[ -n "$MOODLEDATA_DIR" ]] && basic_log_info "Auto-detectado directorio datos: $MOODLEDATA_DIR"
         fi
     fi
     

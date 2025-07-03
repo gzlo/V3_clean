@@ -5,6 +5,54 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.4.0] - 2025-01-02
+
+### 🎯 Auto-detección de Configuración desde config.php de Moodle
+
+#### ✨ Nuevas Funcionalidades
+- **Parsing automático de config.php**: Nueva función `parse_moodle_config()` que extrae automáticamente todas las variables críticas del archivo de configuración de Moodle
+- **Auto-detección de instalaciones**: Función `auto_discover_moodle_config()` que busca automáticamente instalaciones de Moodle en directorios comunes
+- **Selección interactiva**: Nueva función `select_moodle_config_interactive()` que permite al usuario seleccionar entre múltiples instalaciones detectadas
+- **Preconfiguración inteligente**: Los valores detectados se usan automáticamente como predeterminados en todos los instaladores
+
+#### 🔧 Variables Detectadas Automáticamente
+- **$CFG->dbhost**: Host de la base de datos
+- **$CFG->dbname**: Nombre de la base de datos  
+- **$CFG->dbuser**: Usuario de la base de datos
+- **$CFG->dbpass**: Contraseña de la base de datos
+- **$CFG->dataroot**: Directorio de datos de Moodle
+- **$CFG->wwwroot**: URL raíz del sitio (para extraer dominio)
+- **$CFG->admin**: Directorio de administración (opcional)
+
+#### 🛠️ Instaladores Actualizados
+- **install-interactive.sh**: Incluye flujo completo de autodetección con confirmación del usuario
+- **install.sh**: Agrega opción de autodetección antes de la configuración manual
+- **moodle_backup.sh**: Función `auto_detect_database_config()` mejorada para detectar también contraseña y dataroot
+
+#### 💡 Mejoras de UX
+- **Flujo optimizado**: Pregunta automática sobre autodetección al inicio de la configuración
+- **Valores inteligentes**: Los campos se precompletana con valores detectados, permitiendo confirmación o modificación
+- **Feedback visual**: Muestra claramente qué valores fueron detectados desde el config.php
+- **Validación robusta**: Verifica que el archivo sea un config.php válido de Moodle antes de procesar
+
+#### 🧪 Tests Automatizados
+- **Nuevo test completo**: `test-moodle-config-parsing.sh` con 7 casos de test diferentes
+- **Cobertura completa**: Tests para todos los instaladores y formatos de config.php
+- **Validación de errores**: Tests para archivos inválidos, inexistentes y formatos alternativos
+- **Integración con CI**: El nuevo test se ejecuta automáticamente en `run-tests.sh`
+
+#### 📝 Mejoras Técnicas
+- **Parsing robusto**: Maneja diferentes formatos de configuración y espaciado
+- **Seguridad mejorada**: Las contraseñas se muestran como [****] en logs
+- **Compatibilidad hacia atrás**: Mantiene funcionalidad existente sin cambios breaking
+- **Fallbacks inteligentes**: Si la autodetección falla, continúa con configuración manual
+
+#### 🔍 Algoritmo de Búsqueda
+- **Directorios optimizados por panel**: Busca primero en ubicaciones específicas según el tipo de panel detectado
+- **Patrones adaptativos**: Incluye wildcards para buscar en subdominios y múltiples sitios
+- **Validación de archivos**: Verifica que cada config.php encontrado sea realmente de Moodle
+- **Presentación clara**: Muestra información resumida de cada instalación encontrada
+
 ## [3.3.0] - 2025-01-17
 
 ### 🚀 Detección de Paneles Ampliada y Mejoras de UX

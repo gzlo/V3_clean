@@ -16,6 +16,7 @@
 # - Configuración asistida de cron con horarios amigables
 # - Instalación multi-cliente con configuraciones independientes
 # - Verificación post-instalación y testing
+# - NUEVO: Auto-detección de configuración desde config.php de Moodle
 # ===============================================================================
 
 set -euo pipefail
@@ -37,6 +38,15 @@ USER_INSTALL_DIR="$HOME/bin"
 USER_CONFIG_DIR="$HOME/.config/moodle-backup"
 TEMP_DIR="/tmp/moodle-backup-install-$$"
 
+# Variables para configuración detectada desde Moodle
+DETECTED_DB_HOST=""
+DETECTED_DB_NAME=""
+DETECTED_DB_USER=""
+DETECTED_DB_PASS=""
+DETECTED_DATAROOT=""
+DETECTED_WWWROOT=""
+DETECTED_CONFIG_FOUND=false
+
 # Funciones de logging amigables
 print_header() {
     echo ""
@@ -51,19 +61,178 @@ print_step() {
 }
 
 print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
+    echo -e "${GREEN}✓ $1${NC}"
 }
 
 print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+    echo -e "${YELLOW}⚠ $1${NC}"
 }
 
 print_error() {
-    echo -e "${RED}❌ $1${NC}"
+    echo -e "${RED}✗ $1${NC}"
 }
 
-print_info() {
-    echo -e "${CYAN}ℹ️  $1${NC}"
+# ===================== FUNCIÓN PARA PARSEAR CONFIG.PHP DE MOODLE =====================
+# Función para extraer configuración desde config.php de Moodle
+parse_moodle_config() {
+    local config_path="$1"
+    local base_dir="$2"  # Directorio base para buscar config.php si no se proporciona path
+    
+    # Variables de salida (globales)
+    DETECTED_DB_HOST=""
+    DETECTED_DB_NAME=""
+    DETECTED_DB_USER=""
+    DETECTED_DB_PASS=""
+    DETECTED_DATAROOT=""
+    DETECTED_WWWROOT=""
+    DETECTED_CONFIG_FOUND=false
+    
+    # Determinar ruta del config.php
+    local config_file=""
+    if [[ -n "$config_path" ]] && [[ -f "$config_path" ]]; then
+        config_file="$config_path"
+    elif [[ -n "$base_dir" ]] && [[ -f "$base_dir/config.php" ]]; then
+        config_file="$base_dir/config.php"
+    else
+        print_warning "No se pudo encontrar config.php en las rutas especificadas"
+        return 1
+    fi
+    
+    # Verificar que es un config.php válido de Moodle
+    if ! grep -q '\$CFG.*=' "$config_file" 2>/dev/null; then
+        print_warning "El archivo $config_file no parece ser un config.php válido de Moodle"
+        return 1
+    fi
+    
+    print_step "Parseando configuración de Moodle desde: $config_file"
+    
+    # Extraer variables de configuración usando sed/grep robusto
+    # $CFG->dbhost
+    if DETECTED_DB_HOST=$(grep -E "^\s*\\\$CFG->dbhost\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_HOST" ]] && print_success "Host BD detectado: $DETECTED_DB_HOST"
+    fi
+    
+    # $CFG->dbname
+    if DETECTED_DB_NAME=$(grep -E "^\s*\\\$CFG->dbname\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_NAME" ]] && print_success "Nombre BD detectado: $DETECTED_DB_NAME"
+    fi
+    
+    # $CFG->dbuser
+    if DETECTED_DB_USER=$(grep -E "^\s*\\\$CFG->dbuser\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_USER" ]] && print_success "Usuario BD detectado: $DETECTED_DB_USER"
+    fi
+    
+    # $CFG->dbpass (más sensible)
+    if DETECTED_DB_PASS=$(grep -E "^\s*\\\$CFG->dbpass\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_PASS" ]] && print_success "Contraseña BD detectada: [****]"
+    fi
+    
+    # $CFG->dataroot
+    if DETECTED_DATAROOT=$(grep -E "^\s*\\\$CFG->dataroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DATAROOT" ]] && print_success "Directorio de datos detectado: $DETECTED_DATAROOT"
+    fi
+    
+    # $CFG->wwwroot (opcional, para validación)
+    if DETECTED_WWWROOT=$(grep -E "^\s*\\\$CFG->wwwroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_WWWROOT" ]] && print_step "URL raíz detectada: $DETECTED_WWWROOT"
+    fi
+    
+    # Validar que se encontraron los datos críticos
+    if [[ -n "$DETECTED_DB_HOST" ]] && [[ -n "$DETECTED_DB_NAME" ]] && [[ -n "$DETECTED_DB_USER" ]]; then
+        DETECTED_CONFIG_FOUND=true
+        print_success "Configuración de Moodle detectada exitosamente"
+        return 0
+    else
+        print_warning "Configuración de Moodle incompleta (faltan datos críticos)"
+        return 1
+    fi
+}
+
+# Función para buscar instalaciones de Moodle automáticamente
+auto_discover_moodle_simple() {
+    print_step "Buscando instalaciones de Moodle automáticamente..."
+    
+    # Directorios comunes donde buscar
+    local search_dirs=(
+        "/var/www/html"
+        "/var/www"
+        "/srv/www"
+        "/opt/lampp/htdocs"
+        "/usr/local/apache2/htdocs"
+        "/home/*/public_html"
+        "/home/*/www"
+        "/home/*/htdocs"
+        "/home/*/domains/*/public_html"
+    )
+    
+    local found_configs=()
+    local found_dirs=()
+    
+    # Buscar config.php en los directorios candidatos
+    for dir_pattern in "${search_dirs[@]}"; do
+        # Expandir wildcards si existen
+        for dir in $dir_pattern; do
+            if [[ -d "$dir" ]] && [[ -f "$dir/config.php" ]]; then
+                # Verificar que es un config.php de Moodle
+                if grep -q '\$CFG.*dbname\|\$CFG.*wwwroot' "$dir/config.php" 2>/dev/null; then
+                    found_configs+=("$dir/config.php")
+                    found_dirs+=("$dir")
+                    print_step "Instalación Moodle encontrada: $dir"
+                fi
+            fi
+        done
+    done
+    
+    if [[ ${#found_configs[@]} -gt 0 ]]; then
+        print_success "Se encontraron ${#found_configs[@]} instalaciones de Moodle"
+        
+        # Si hay una sola instalación, usarla automáticamente
+        if [[ ${#found_configs[@]} -eq 1 ]]; then
+            if parse_moodle_config "${found_configs[0]}" "${found_dirs[0]}"; then
+                echo ""
+                print_success "Configuración cargada automáticamente desde: ${found_dirs[0]}"
+                echo "• Host BD: $DETECTED_DB_HOST"
+                echo "• Nombre BD: $DETECTED_DB_NAME"
+                echo "• Usuario BD: $DETECTED_DB_USER"
+                echo "• Directorio datos: $DETECTED_DATAROOT"
+                echo ""
+                return 0
+            fi
+        else
+            # Múltiples instalaciones - mostrar opciones
+            echo ""
+            echo "Seleccione la instalación de Moodle a usar:"
+            for i in "${!found_dirs[@]}"; do
+                echo "$((i + 1)). ${found_dirs[$i]}"
+            done
+            echo "0. Configurar manualmente"
+            echo ""
+            
+            local selection=""
+            while true; do
+                echo -n "Seleccione opción [1-${#found_dirs[@]}] o 0 para manual: "
+                read -r selection
+                
+                if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 0 ]] && [[ $selection -le ${#found_dirs[@]} ]]; then
+                    break
+                else
+                    print_warning "Selección inválida. Ingrese un número entre 0 y ${#found_dirs[@]}"
+                fi
+            done
+            
+            if [[ $selection -gt 0 ]]; then
+                local selected_index=$((selection - 1))
+                if parse_moodle_config "${found_configs[$selected_index]}" "${found_dirs[$selected_index]}"; then
+                    print_success "Configuración cargada desde: ${found_dirs[$selected_index]}"
+                    return 0
+                fi
+            fi
+        fi
+    else
+        print_warning "No se encontraron instalaciones de Moodle automáticamente"
+    fi
+    
+    return 1
 }
 
 # Banner de bienvenida
@@ -451,7 +620,7 @@ configure_first_client() {
             sed -i "s/CLIENT_NAME=.*/CLIENT_NAME=\"$client_name\"/" "$config_file"
             sed -i "s/CLIENT_DESCRIPTION=.*/CLIENT_DESCRIPTION=\"$client_description\"/" "$config_file"
             sed -i "s/PANEL_TYPE=.*/PANEL_TYPE=\"auto\"/" "$config_file"
-            sed -i "s/AUTO_DETECT_AGGRESSIVE=.*/AUTO_DETECT_AGGRESSIVE=\"true\"/" "$config_file"
+            sed -i "s/AUTO_DETECT_AGRESSIVE=.*/AUTO_DETECT_AGRESSIVE=\"true\"/" "$config_file"
             
             print_success "Configuración inicial creada: $config_file"
         else
@@ -472,22 +641,107 @@ manual_configuration_wizard() {
     local client_name="$2"
     local client_description="$3"
     
-    print_step "Configuración manual asistida..."
+    print_step "Configuración asistida con autodetección de Moodle..."
+    
+    # NUEVA FUNCIONALIDAD: Autodetección de Moodle
+    echo ""
+    echo "🔍 DETECCIÓN AUTOMÁTICA DE INSTALACIONES DE MOODLE"
+    echo ""
+    echo "¿Desea buscar automáticamente instalaciones de Moodle? [Y/n]: "
+    read -r auto_detect_choice
+    auto_detect_choice="${auto_detect_choice:-Y}"
+    
+    local config_detected=false
+    if [[ "$auto_detect_choice" =~ ^[Yy] ]]; then
+        if auto_discover_moodle_simple; then
+            config_detected=true
+            print_success "Configuración detectada automáticamente"
+        fi
+    fi
+    
+    # Variables para configuración
+    local panel_user=""
+    local www_dir=""
+    local moodledata_dir=""
+    local db_name=""
+    local db_user=""
+    local db_host="localhost"
+    
+    # Si se detectó configuración, usar como valores por defecto
+    if [[ "$config_detected" == "true" ]]; then
+        # Intentar detectar directorio web desde la configuración
+        for dir in "${found_dirs[@]:-}"; do
+            if [[ -n "$dir" ]]; then
+                www_dir="$dir"
+                break
+            fi
+        done
+        
+        moodledata_dir="$DETECTED_DATAROOT"
+        db_name="$DETECTED_DB_NAME"
+        db_user="$DETECTED_DB_USER"
+        db_host="${DETECTED_DB_HOST:-localhost}"
+        
+        echo ""
+        print_success "Usando valores detectados como predeterminados"
+        echo "Puede modificarlos si es necesario:"
+        echo ""
+    fi
     
     echo -n "Usuario del panel (dejar vacío si no aplica): "
     read -r panel_user
     
-    echo -n "Directorio web de Moodle (ej: /home/user/public_html): "
-    read -r www_dir
+    # Configuración del directorio web
+    if [[ -n "$www_dir" ]]; then
+        echo "Directorio web de Moodle [$www_dir]: "
+        read -r input_www_dir
+        www_dir="${input_www_dir:-$www_dir}"
+    else
+        echo -n "Directorio web de Moodle (ej: /home/user/public_html): "
+        read -r www_dir
+    fi
     
-    echo -n "Directorio moodledata (ej: /home/user/moodledata): "
-    read -r moodledata_dir
+    # Si se ingresó un directorio web manualmente, intentar leer config.php
+    if [[ -n "$www_dir" ]] && [[ ! "$config_detected" == "true" ]] && [[ -f "$www_dir/config.php" ]]; then
+        print_step "Detectando configuración desde directorio especificado..."
+        if parse_moodle_config "$www_dir/config.php" "$www_dir"; then
+            config_detected=true
+            moodledata_dir="$DETECTED_DATAROOT"
+            db_name="$DETECTED_DB_NAME"
+            db_user="$DETECTED_DB_USER"
+            db_host="${DETECTED_DB_HOST:-localhost}"
+            print_success "Configuración actualizada desde config.php"
+        fi
+    fi
     
-    echo -n "Nombre de la base de datos: "
-    read -r db_name
+    # Configuración del directorio de datos
+    if [[ -n "$moodledata_dir" ]]; then
+        echo "Directorio moodledata [$moodledata_dir]: "
+        read -r input_moodledata_dir
+        moodledata_dir="${input_moodledata_dir:-$moodledata_dir}"
+    else
+        echo -n "Directorio moodledata (ej: /home/user/moodledata): "
+        read -r moodledata_dir
+    fi
     
-    echo -n "Usuario de la base de datos: "
-    read -r db_user
+    # Configuración de base de datos
+    if [[ -n "$db_name" ]]; then
+        echo "Nombre de la base de datos [$db_name]: "
+        read -r input_db_name
+        db_name="${input_db_name:-$db_name}"
+    else
+        echo -n "Nombre de la base de datos: "
+        read -r db_name
+    fi
+    
+    if [[ -n "$db_user" ]]; then
+        echo "Usuario de la base de datos [$db_user]: "
+        read -r input_db_user
+        db_user="${input_db_user:-$db_user}"
+    else
+        echo -n "Usuario de la base de datos: "
+        read -r db_user
+    fi
     
     # Información sobre configuración de contraseña de BD
     echo ""
@@ -508,10 +762,18 @@ manual_configuration_wizard() {
     echo "1. Escribir ahora (texto plano en archivo config - menos seguro)"
     echo "2. Crear archivo protegido automáticamente (recomendado)"
     echo "3. Variable de entorno (configurar manualmente después)"
-    echo "4. Configurar más tarde (solo instrucciones)"
-    echo -n "Selecciona opción (1-4) [2]: "
-    read -r db_pass_choice
-    db_pass_choice="${db_pass_choice:-2}"
+    if [[ "$config_detected" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+        echo "4. Usar contraseña detectada desde config.php (recomendado)"
+        echo "5. Configurar más tarde (solo instrucciones)"
+        echo -n "Selecciona opción (1-5) [4]: "
+        read -r db_pass_choice
+        db_pass_choice="${db_pass_choice:-4}"
+    else
+        echo "4. Configurar más tarde (solo instrucciones)"
+        echo -n "Selecciona opción (1-4) [2]: "
+        read -r db_pass_choice
+        db_pass_choice="${db_pass_choice:-2}"
+    fi
     
     local db_pass=""
     case "$db_pass_choice" in
@@ -598,6 +860,43 @@ manual_configuration_wizard() {
             db_pass=""
             ;;
         "4")
+            # Opción 4: Usar contraseña detectada (solo si está disponible)
+            if [[ "$config_detected" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+                db_pass="$DETECTED_DB_PASS"
+                print_success "✅ Usando contraseña detectada desde config.php"
+                echo ""
+                echo "⚠️  IMPORTANTE: La contraseña se guardará en texto plano en moodle_backup.conf"
+                echo "   Para mayor seguridad, considere cambiar a archivo protegido después:"
+                echo "   sudo echo '$DETECTED_DB_PASS' > /etc/mysql/backup.pwd"
+                echo "   sudo chmod 600 /etc/mysql/backup.pwd"
+                echo "   sudo chown root:root /etc/mysql/backup.pwd"
+                echo "   # Luego remover DB_PASS del archivo .conf"
+                echo ""
+            else
+                # Fallback a configuración postpone
+                echo ""
+                echo "✅ Configuración postpone seleccionada"
+                echo "📋 OPCIONES DISPONIBLES PARA CONFIGURAR DESPUÉS:"
+                echo ""
+                echo "   Opción A - Archivo protegido (RECOMENDADO):"
+                echo "   sudo mkdir -p /etc/mysql"
+                echo "   sudo echo 'tu_password_aquí' > /etc/mysql/backup.pwd"
+                echo "   sudo chmod 600 /etc/mysql/backup.pwd"
+                echo "   sudo chown root:root /etc/mysql/backup.pwd"
+                echo ""
+                echo "   Opción B - Variable de entorno:"
+                echo "   export MYSQL_PASSWORD='tu_password_aquí'"
+                echo "   # Agregar a ~/.bashrc para persistir"
+                echo ""
+                echo "   Opción C - En archivo de configuración:"
+                echo "   Editar archivos .conf y agregar: DB_PASS=tu_password"
+                echo "   (Menos seguro - solo para desarrollo)"
+                echo ""
+                db_pass=""
+            fi
+            ;;
+        "5")
+            # Opción 5: Configuración postpone (solo cuando hay contraseña detectada)
             echo ""
             echo "✅ Configuración postpone seleccionada"
             echo "📋 OPCIONES DISPONIBLES PARA CONFIGURAR DESPUÉS:"
@@ -612,11 +911,21 @@ manual_configuration_wizard() {
             echo "   export MYSQL_PASSWORD='tu_password_aquí'"
             echo "   # Agregar a ~/.bashrc para persistir"
             echo ""
+            echo "   Opción C - En archivo de configuración:"
+            echo "   Editar archivos .conf y agregar: DB_PASS=tu_password"
+            echo "   (Menos seguro - solo para desarrollo)"
+            echo ""
             db_pass=""
             ;;
         *)
-            print_error "Opción inválida, usando configuración postpone"
-            db_pass=""
+            # Fallback: usar contraseña detectada si está disponible, sino postpone
+            if [[ "$config_detected" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+                db_pass="$DETECTED_DB_PASS"
+                print_success "✅ Usando contraseña detectada desde config.php (opción por defecto)"
+            else
+                print_error "Opción inválida, usando configuración postpone"
+                db_pass=""
+            fi
             ;;
     esac
     
@@ -663,7 +972,7 @@ TMP_DIR="/tmp/moodle_backup"
 DB_NAME="$db_name"
 DB_USER="$db_user"
 DB_PASS="$db_pass"
-DB_HOST="localhost"
+DB_HOST="$db_host"
 
 # ===================== CONFIGURACIÓN DE GOOGLE DRIVE =====================
 GDRIVE_REMOTE="gdrive:moodle_backups"
@@ -870,7 +1179,7 @@ configure_additional_clients() {
                     sed -i "s/CLIENT_NAME=.*/CLIENT_NAME=\"$client_name\"/" "$client_config"
                     sed -i "s/CLIENT_DESCRIPTION=.*/CLIENT_DESCRIPTION=\"$client_description\"/" "$client_config"
                     sed -i "s/PANEL_TYPE=.*/PANEL_TYPE=\"auto\"/" "$client_config"
-                    sed -i "s/AUTO_DETECT_AGGRESSIVE=.*/AUTO_DETECT_AGGRESSIVE=\"true\"/" "$client_config"
+                    sed -i "s/AUTO_DETECT_AGRESSIVE=.*/AUTO_DETECT_AGRESSIVE=\"true\"/" "$client_config"
                     sed -i "s/LOG_FILE=.*/LOG_FILE=\"\/var\/log\/moodle_backup_${client_name}.log\"/" "$client_config"
                     
                     print_success "Configuración de auto-detección creada: $client_config"

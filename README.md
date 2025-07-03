@@ -1,11 +1,50 @@
 # 🚀 Moodle Backup V3 - Sistema Multi-Cliente Mejorado
 
-[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.4.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
 [![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Hestia%20%7C%20CyberPanel%20%7C%20Docker%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
 Sistema avanzado de backup para Moodle con **configuración interactiva inteligente**, **auto-detección de paneles** y **lectura automática de config.php**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
+
+## 🆕 Novedades de la Versión 3.4.0
+
+### 🎯 Auto-detección Completa de Configuración de Moodle
+- **Parsing automático de config.php**: Extrae automáticamente todas las variables críticas (`$CFG->dbhost`, `$CFG->dbname`, `$CFG->dbuser`, `$CFG->dbpass`, `$CFG->dataroot`)
+- **Búsqueda inteligente de instalaciones**: Encuentra automáticamente todas las instalaciones de Moodle en el servidor
+- **Selección interactiva**: Permite elegir entre múltiples instalaciones detectadas
+- **Preconfiguración total**: Todos los valores se preconfiguran automáticamente, solo requiere confirmación
+
+### 🔍 Algoritmo de Detección Avanzado
+- **Búsqueda optimizada por panel**: Prioriza directorios específicos según el tipo de panel detectado
+- **Patrones adaptativos**: Incluye wildcards para detectar subdominios y sitios múltiples  
+- **Validación robusta**: Verifica que cada config.php sea realmente de Moodle
+- **Fallbacks inteligentes**: Si falla la autodetección, permite configuración manual
+
+### 💡 Experiencia Completamente Automatizada
+```bash
+🔍 DETECCIÓN AUTOMÁTICA DE MOODLE
+¿Buscar automáticamente instalaciones de Moodle? [Y/n]: Y
+
+📁 Instalación Moodle encontrada: /home/usuario/public_html
+✅ Configuración de Moodle detectada exitosamente
+
+📋 CONFIGURACIÓN DETECTADA DESDE MOODLE:
+   • Host BD: localhost
+   • Nombre BD: usuario_moodle  
+   • Usuario BD: usuario_db
+   • Contraseña BD: [detectada]
+   • Datos Moodle: /home/usuario/moodledata
+   • URL Moodle: https://moodle.ejemplo.com
+
+✅ Instalación de Moodle autodetectada y configurada
+```
+
+### 🧪 Tests Automatizados Ampliados
+- **Nuevo test específico**: `test-moodle-config-parsing.sh` con 7 casos de prueba
+- **Cobertura completa**: Tests para todos los instaladores y formatos de config.php
+- **Validación de errores**: Tests para archivos inválidos y formatos alternativos
+- **Integración total**: Ejecuta automáticamente en la suite de tests
 
 ## 🆕 Novedades de la Versión 3.3.0
 
@@ -87,22 +126,66 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh 
 ¿Usar el panel detectado (cpanel)? [Y/n]: Y
 ```
 
-### 2. Lectura Automática de Config.php
+### 2. Auto-Detección de Instalaciones de Moodle (NUEVO v3.4.0)
 ```
-🔧 Leyendo configuración de Moodle desde /home/usuario/public_html/config.php...
+� DETECCIÓN AUTOMÁTICA DE MOODLE
+¿Buscar automáticamente instalaciones de Moodle? [Y/n]: Y
 
-✅ Configuración encontrada en Moodle:
-   Tipo de BD: mysqli
-   Host BD: localhost
-   Nombre BD: usuario_moodle
-   Usuario BD: usuario_db
-   Directorio datos: /home/usuario/moodledata
-   URL del sitio: https://moodle.ejemplo.com
+📁 Instalación Moodle encontrada: /home/usuario/public_html
+   • BD: usuario_moodle@localhost
+   • URL: https://moodle.ejemplo.com  
+   • Datos: /home/usuario/moodledata
 
-¿Usar esta configuración detectada? [Y/n]: Y
+✅ Configuración detectada automáticamente desde config.php
 ```
 
-### 3. Configuración Simplificada e Inteligente
+### 3. Selección Múltiple (Si hay varias instalaciones)
+```
+🎯 Instalaciones de Moodle encontradas:
+  1. /home/usuario/public_html
+     • BD: site1_moodle@localhost
+     • URL: https://moodle1.ejemplo.com
+     • Datos: /home/usuario/moodledata1
+     
+  2. /home/usuario/domains/curso.ejemplo.com/public_html
+     • BD: site2_moodle@localhost
+     • URL: https://curso.ejemplo.com
+     • Datos: /home/usuario/moodledata2
+     
+  0. Especificar ruta manualmente
+
+Seleccione una instalación [1-2] o 0 para manual: 1
+```
+
+### 4. Configuración Precompletada
+```
+📋 VALORES DETECTADOS DESDE CONFIG.PHP:
+   • Host: localhost
+   • Base de datos: usuario_moodle
+   • Usuario: usuario_db
+   • Contraseña: [detectada]
+
+Puede confirmar estos valores o modificarlos según necesite:
+
+Host de la base de datos [localhost]: ✓
+Nombre de la base de datos [usuario_moodle]: ✓
+Usuario de la base de datos [usuario_db]: ✓
+```
+
+### 5. Configuración de Contraseña Inteligente
+```
+¿Cómo prefieres configurar la contraseña?
+1. Variable de entorno (MÁS SEGURO)
+2. Archivo protegido /etc/mysql/backup.pwd (RECOMENDADO)
+3. Ingresar ahora en texto plano (MENOS SEGURO)
+4. Usar contraseña detectada desde config.php (RECOMENDADO) ⭐
+5. Configurar más tarde
+
+Selecciona opción (1-5) [4]: 4
+✅ Usando contraseña detectada desde config.php
+```
+
+### 6. Configuración Simplificada e Inteligente
 - **Placeholders inteligentes**: Rutas pre-completadas con información real del sistema
 - **Navegación avanzada**: Edición completa con flechas y atajos de teclado  
 - **Solo campos necesarios**: Se pregunta únicamente por campos que no se pueden detectar

@@ -224,11 +224,836 @@ ask_yes_no() {
 # Función para validar email
 validate_email() {
     local email="$1"
-    if [[ $email =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
+    if [[ "$email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]]; then
         return 0
     else
         return 1
     fi
+}
+
+# ===================== FUNCIÓN PARA PARSEAR CONFIG.PHP DE MOODLE =====================
+# Función para extraer configuración completa desde config.php de Moodle
+parse_moodle_config() {
+    local config_path="$1"
+    local base_dir="$2"  # Directorio base para buscar config.php si no se proporciona path
+    
+    # Variables de salida (globales)
+    DETECTED_DB_HOST=""
+    DETECTED_DB_NAME=""
+    DETECTED_DB_USER=""
+    DETECTED_DB_PASS=""
+    DETECTED_DATAROOT=""
+    DETECTED_WWWROOT=""
+    DETECTED_ADMIN_DIR=""
+    DETECTED_CONFIG_FOUND=false
+    
+    # Determinar ruta del config.php
+    local config_file=""
+    if [[ -n "$config_path" ]] && [[ -f "$config_path" ]]; then
+        config_file="$config_path"
+    elif [[ -n "$base_dir" ]] && [[ -f "$base_dir/config.php" ]]; then
+        config_file="$base_dir/config.php"
+    else
+        log_warning "No se pudo encontrar config.php en las rutas especificadas"
+        return 1
+    fi
+    
+    # Verificar que es un config.php válido de Moodle
+    if ! grep -q '\$CFG.*=' "$config_file" 2>/dev/null; then
+        log_warning "El archivo $config_file no parece ser un config.php válido de Moodle"
+        return 1
+    fi
+    
+    log_info "📋 Parseando configuración de Moodle desde: $config_file"
+    
+    # Extraer variables de configuración usando sed/grep robusto
+    # $CFG->dbhost
+    if DETECTED_DB_HOST=$(grep -E "^\s*\\\$CFG->dbhost\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_HOST" ]] && log_success "✓ Host BD detectado: $DETECTED_DB_HOST"
+    fi
+    
+    # $CFG->dbname
+    if DETECTED_DB_NAME=$(grep -E "^\s*\\\$CFG->dbname\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_NAME" ]] && log_success "✓ Nombre BD detectado: $DETECTED_DB_NAME"
+    fi
+    
+    # $CFG->dbuser
+    if DETECTED_DB_USER=$(grep -E "^\s*\\\$CFG->dbuser\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_USER" ]] && log_success "✓ Usuario BD detectado: $DETECTED_DB_USER"
+    fi
+    
+    # $CFG->dbpass (más sensible)
+    if DETECTED_DB_PASS=$(grep -E "^\s*\\\$CFG->dbpass\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_PASS" ]] && log_success "✓ Contraseña BD detectada: [****]"
+    fi
+    
+    # $CFG->dataroot
+    if DETECTED_DATAROOT=$(grep -E "^\s*\\\$CFG->dataroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DATAROOT" ]] && log_success "✓ Directorio de datos detectado: $DETECTED_DATAROOT"
+    fi
+    
+    # $CFG->wwwroot (opcional, para validación)
+    if DETECTED_WWWROOT=$(grep -E "^\s*\\\$CFG->wwwroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_WWWROOT" ]] && log_success "✓ URL raíz detectada: $DETECTED_WWWROOT"
+    fi
+    
+    # $CFG->admin (opcional)
+    if DETECTED_ADMIN_DIR=$(grep -E "^\s*\\\$CFG->admin\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_ADMIN_DIR" ]] && log_info "✓ Directorio admin detectado: $DETECTED_ADMIN_DIR"
+    fi
+    
+    # Validar que se encontraron los datos críticos
+    if [[ -n "$DETECTED_DB_HOST" ]] && [[ -n "$DETECTED_DB_NAME" ]] && [[ -n "$DETECTED_DB_USER" ]]; then
+        DETECTED_CONFIG_FOUND=true
+        log_success "🎯 Configuración de Moodle detectada exitosamente"
+        return 0
+    else
+        log_warning "⚠️ Configuración de Moodle incompleta (faltan datos críticos)"
+        return 1
+    fi
+}
+
+# Función para buscar automáticamente config.php en directorios comunes
+auto_discover_moodle_config() {
+    local search_base="${1:-/}"  # Directorio base para búsqueda
+    local panel_user="${2:-}"    # Usuario del panel (para optimizar búsqueda)
+    
+    log_step "🔍 Buscando instalaciones de Moodle automáticamente..."
+    
+    # Variables de salida
+    DISCOVERED_CONFIG_PATHS=()
+    DISCOVERED_MOODLE_INSTALLS=()
+    
+    # Directorios candidatos según el tipo de panel y usuario
+    local search_dirs=()
+    
+    # Agregar directorios específicos del panel/usuario si están definidos
+    if [[ -n "$panel_user" ]]; then
+        case "${PANEL_TYPE:-}" in
+            "cpanel")
+                search_dirs+=(
+                    "/home/$panel_user/public_html"
+                    "/home/$panel_user/www"
+                    "/home/$panel_user/htdocs"
+                    "/home/$panel_user/domains/*/public_html"
+                    "/home/$panel_user/subdomains/*/public_html"
+                )
+                ;;
+            "plesk")
+                search_dirs+=(
+                    "/var/www/vhosts/$panel_user/httpdocs"
+                    "/var/www/vhosts/*/httpdocs"
+                    "/opt/psa/var/modules/domains/$panel_user"
+                )
+                ;;
+            "directadmin")
+                search_dirs+=(
+                    "/home/$panel_user/domains/*/public_html"
+                    "/home/$panel_user/public_html"
+                )
+                ;;
+            "hestia"|"vestacp")
+                search_dirs+=(
+                    "/home/$panel_user/web/*/public_html"
+                    "/home/$panel_user/web/*/www"
+                )
+                ;;
+            *)
+                # Directorios genéricos
+                search_dirs+=(
+                    "/var/www/html"
+                    "/var/www"
+                    "/home/$panel_user/public_html"
+                    "/home/$panel_user/www"
+                    "/home/$panel_user/htdocs"
+                )
+                ;;
+        esac
+    fi
+    
+    # Agregar directorios comunes si no se especificó usuario
+    search_dirs+=(
+        "/var/www/html"
+        "/var/www"
+        "/srv/www"
+        "/opt/lampp/htdocs"
+        "/usr/local/apache2/htdocs"
+        "/home/*/public_html"
+        "/home/*/www"
+        "/home/*/htdocs"
+    )
+    
+    # Buscar config.php en los directorios candidatos
+    local found_configs=0
+    for dir_pattern in "${search_dirs[@]}"; do
+        # Expandir wildcards si existen
+        for dir in $dir_pattern; do
+            if [[ -d "$dir" ]] && [[ -f "$dir/config.php" ]]; then
+                # Verificar que es un config.php de Moodle
+                if grep -q '\$CFG.*dbname\|\$CFG.*wwwroot' "$dir/config.php" 2>/dev/null; then
+                    DISCOVERED_CONFIG_PATHS+=("$dir/config.php")
+                    DISCOVERED_MOODLE_INSTALLS+=("$dir")
+                    found_configs=$((found_configs + 1))
+                    log_info "📁 Instalación Moodle encontrada: $dir"
+                fi
+            fi
+        done
+    done
+    
+    if [[ $found_configs -gt 0 ]]; then
+        log_success "✅ Se encontraron $found_configs instalaciones de Moodle"
+        return 0
+    else
+        log_warning "⚠️ No se encontraron instalaciones de Moodle"
+        return 1
+    fi
+}
+
+# Función para seleccionar configuración de Moodle interactivamente
+select_moodle_config_interactive() {
+    local force_search="${1:-false}"
+    
+    # Variables globales para almacenar la configuración seleccionada
+    SELECTED_CONFIG_PATH=""
+    SELECTED_WWW_DIR=""
+    
+    # Si no se fuerza la búsqueda y ya tenemos WWW_DIR definido, intentar usarlo
+    if [[ "$force_search" != "true" ]] && [[ -n "${WWW_DIR:-}" ]]; then
+        if [[ -f "$WWW_DIR/config.php" ]]; then
+            log_info "📋 Usando directorio WWW_DIR existente: $WWW_DIR"
+            if parse_moodle_config "$WWW_DIR/config.php" "$WWW_DIR"; then
+                SELECTED_CONFIG_PATH="$WWW_DIR/config.php"
+                SELECTED_WWW_DIR="$WWW_DIR"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Buscar instalaciones automáticamente
+    if auto_discover_moodle_config "/" "${PANEL_USER:-}"; then
+        echo ""
+        echo -e "${BLUE}🎯 Instalaciones de Moodle encontradas:${NC}"
+        
+        # Mostrar opciones encontradas
+        for i in "${!DISCOVERED_MOODLE_INSTALLS[@]}"; do
+            local install_dir="${DISCOVERED_MOODLE_INSTALLS[$i]}"
+            local config_path="${DISCOVERED_CONFIG_PATHS[$i]}"
+            
+            echo -e "  ${GREEN}$((i + 1)).${NC} $install_dir"
+            
+            # Mostrar información básica de cada instalación
+            if parse_moodle_config "$config_path" "$install_dir"; then
+                echo -e "     ${GRAY}• BD: ${DETECTED_DB_NAME}@${DETECTED_DB_HOST}${NC}"
+                echo -e "     ${GRAY}• URL: ${DETECTED_WWWROOT}${NC}"
+                echo -e "     ${GRAY}• Datos: ${DETECTED_DATAROOT}${NC}"
+            fi
+            echo ""
+        done
+        
+        echo -e "  ${YELLOW}0.${NC} Especificar ruta manualmente"
+        echo ""
+        
+        # Selección interactiva
+        local selection=""
+        while true; do
+            read -r -p "Seleccione una instalación [1-${#DISCOVERED_MOODLE_INSTALLS[@]}] o 0 para manual: " selection
+            
+            if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 0 ]] && [[ $selection -le ${#DISCOVERED_MOODLE_INSTALLS[@]} ]]; then
+                break
+            else
+                log_warning "Selección inválida. Ingrese un número entre 0 y ${#DISCOVERED_MOODLE_INSTALLS[@]}"
+            fi
+        done
+        
+        if [[ $selection -gt 0 ]]; then
+            # Selección de instalación detectada
+            local selected_index=$((selection - 1))
+            SELECTED_WWW_DIR="${DISCOVERED_MOODLE_INSTALLS[$selected_index]}"
+            SELECTED_CONFIG_PATH="${DISCOVERED_CONFIG_PATHS[$selected_index]}"
+            
+            log_success "✅ Instalación seleccionada: $SELECTED_WWW_DIR"
+            
+            # Parsear la configuración seleccionada
+            if parse_moodle_config "$SELECTED_CONFIG_PATH" "$SELECTED_WWW_DIR"; then
+                return 0
+            else
+                log_error "Error parseando la configuración seleccionada"
+                return 1
+            fi
+        fi
+    fi
+    
+    # Opción manual (cuando selection=0 o no se encontraron instalaciones)
+    echo ""
+    log_info "📂 Configuración manual del directorio de Moodle"
+    
+    local manual_path=""
+    while true; do
+        read -r -e -p "Ingrese la ruta completa al directorio de Moodle (donde está config.php): " manual_path
+        
+        if [[ -z "$manual_path" ]]; then
+            log_warning "La ruta no puede estar vacía"
+            continue
+        fi
+        
+        # Expandir ~ y variables
+        manual_path=$(eval echo "$manual_path")
+        
+        if [[ ! -d "$manual_path" ]]; then
+            log_warning "El directorio '$manual_path' no existe"
+            continue
+        fi
+        
+        if [[ ! -f "$manual_path/config.php" ]]; then
+            log_warning "No se encontró config.php en '$manual_path'"
+            continue
+        fi
+        
+        # Intentar parsear la configuración
+        if parse_moodle_config "$manual_path/config.php" "$manual_path"; then
+            SELECTED_WWW_DIR="$manual_path"
+            SELECTED_CONFIG_PATH="$manual_path/config.php"
+            log_success "✅ Configuración de Moodle cargada desde: $manual_path"
+            return 0
+        else
+            log_warning "Error parseando config.php en '$manual_path'. ¿Es una instalación válida de Moodle?"
+            
+            ask_yes_no "¿Desea intentar con otra ruta?" "true" "TRY_AGAIN"
+            if [[ "$TRY_AGAIN" != "true" ]]; then
+                return 1
+            fi
+        fi
+    done
+}
+
+# Función para detectar automáticamente el tipo de panel
+detect_control_panel() {
+    # Detectar silenciosamente - sin mostrar logs
+    
+    # Verificar cPanel
+    if [[ -d "/usr/local/cpanel" ]] || [[ -f "/usr/local/cpanel/cpanel" ]] || [[ -f "/etc/cpanel.config" ]]; then
+        echo "cpanel"
+        return 0
+    fi
+    
+    # Verificar Plesk
+    if [[ -d "/opt/psa" ]] || [[ -f "/usr/local/psa/version" ]] || [[ -f "/etc/psa/.psa.shadow" ]]; then
+        echo "plesk"
+        return 0
+    fi
+    
+    # Verificar DirectAdmin
+    if [[ -d "/usr/local/directadmin" ]] || [[ -f "/usr/local/directadmin/directadmin" ]] || [[ -f "/etc/directadmin.conf" ]]; then
+        echo "directadmin"
+        return 0
+    fi
+    
+    # Verificar Hestia (evolución de VestaCP)
+    if [[ -d "/usr/local/hestia" ]] || [[ -f "/usr/local/hestia/bin/v-list-users" ]] || command -v v-list-users >/dev/null 2>&1; then
+        echo "hestia"
+        return 0
+    fi
+    
+    # Verificar VestaCP (legacy)
+    if [[ -d "/usr/local/vesta" ]] || [[ -f "/usr/local/vesta/bin/v-list-users" ]]; then
+        echo "vestacp"
+        return 0
+    fi
+    
+    # Verificar CyberPanel
+    if [[ -d "/usr/local/CyberCP" ]] || [[ -f "/usr/local/lsws/bin/openlitespeed" ]] || command -v cyberpanel >/dev/null 2>&1; then
+        echo "cyberpanel"
+        return 0
+    fi
+    
+    # Verificar ISPConfig
+    if [[ -d "/usr/local/ispconfig" ]] || [[ -f "/usr/local/ispconfig/server/server.sh" ]] || [[ -f "/etc/ispconfig.conf" ]]; then
+        echo "ispconfig"
+        return 0
+    fi
+    
+    # Verificar instalaciones Docker
+    if command -v docker >/dev/null 2>&1; then
+        # Buscar contenedores de Moodle activos
+        if docker ps --format "table {{.Names}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            echo "docker"
+            return 0
+        fi
+        # Buscar volúmenes de Moodle
+        if docker volume ls --format "table {{.Name}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            echo "docker"
+            return 0
+        fi
+    fi
+    
+    # Verificar instalación manual con Apache
+    if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
+        # Buscar configuraciones típicas de Apache con Moodle
+        local apache_configs=(
+            "/etc/apache2/sites-enabled"
+            "/etc/apache2/sites-available"
+            "/etc/httpd/conf.d"
+            "/usr/local/apache2/conf"
+        )
+        
+        for config_dir in "${apache_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "*.conf" -exec grep -l "moodle\|DocumentRoot.*www" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "apache"
+                    return 0
+                fi
+            fi
+        done
+    fi
+    
+    # Verificar instalación manual con Nginx
+    if command -v nginx >/dev/null 2>&1; then
+        # Buscar configuraciones típicas de Nginx con Moodle
+        local nginx_configs=(
+            "/etc/nginx/sites-enabled"
+            "/etc/nginx/sites-available"
+            "/etc/nginx/conf.d"
+            "/usr/local/nginx/conf"
+        )
+        
+        for config_dir in "${nginx_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "*.conf" -o -name "*" -exec grep -l "moodle\|root.*www\|root.*var" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "nginx"
+                    return 0
+                fi
+            fi
+        done
+    fi
+    
+    # Verificar instalación manual con LiteSpeed
+    if command -v litespeed >/dev/null 2>&1 || [[ -f "/usr/local/lsws/bin/lshttpd" ]] || [[ -d "/usr/local/lsws" ]]; then
+        # Buscar configuraciones típicas de LiteSpeed con Moodle
+        local litespeed_configs=(
+            "/usr/local/lsws/conf"
+            "/usr/local/lsws/Example/html"
+        )
+        
+        for config_dir in "${litespeed_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "httpd_config.conf" -o -name "*.conf" -exec grep -l "moodle\|docRoot.*www\|docRoot.*var" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "litespeed"
+                    return 0
+                fi
+            fi
+        done
+        
+        # También buscar en directorios típicos de LiteSpeed
+        if [[ -d "/usr/local/lsws/Example/html" ]] && find /usr/local/lsws/Example/html -name "config.php" -exec grep -l "moodle\|Moodle" {} \; 2>/dev/null | head -1 >/dev/null; then
+            echo "litespeed"
+            return 0
+        fi
+    fi
+    
+    # No se detectó ningún panel conocido
+    echo "manual"
+    return 1
+}
+
+# Función para obtener ejemplos de rutas según el panel con información real del usuario
+get_path_examples() {
+    local panel_type="$1"
+    local user="${PANEL_USER:-$(auto_detect_current_user)}"
+    local domain="${DOMAIN_NAME:-dominio.com}"
+    
+    # Si no tenemos usuario válido, usar genérico
+    if [[ -z "$user" ]] || [[ "$user" == "root" ]]; then
+        user="usuario"
+    fi
+    
+    case "$panel_type" in
+        "cpanel")
+            echo "/home/$user/public_html"
+            ;;
+        "plesk")
+            echo "/var/www/vhosts/$domain/httpdocs"
+            ;;
+        "directadmin")
+            echo "/home/$user/domains/$domain/public_html"
+            ;;
+        "hestia")
+            echo "/home/$user/web/$domain/public_html"
+            ;;
+        "vestacp")
+            echo "/home/$user/web/$domain/public_html"
+            ;;
+        "cyberpanel")
+            echo "/home/$domain/public_html"
+            ;;
+        "ispconfig")
+            if [[ "$domain" != "dominio.com" ]]; then
+                echo "/var/www/$domain/web"
+            else
+                echo "/var/www/clients/client1/web1/web"
+            fi
+            ;;
+        "docker")
+            echo "/var/lib/docker/volumes/moodle_data/_data o /opt/moodle"
+            ;;
+        "apache")
+            echo "/var/www/html o /var/www/$domain"
+            ;;
+        "nginx")
+            echo "/var/www/html o /usr/share/nginx/html"
+            ;;
+        "litespeed")
+            echo "/usr/local/lsws/Example/html o /var/www/html"
+            ;;
+        *)
+            echo "/var/www/html o /home/$user/public_html"
+            ;;
+    esac
+}
+
+# Función auxiliar para extraer dominio de URL
+extract_domain_from_url() {
+    local url="$1"
+    # Remover protocolo
+    url=$(echo "$url" | sed 's|^https\?://||')
+    # Remover puerto y path
+    url=$(echo "$url" | sed 's|:[0-9]*||' | sed 's|/.*||')
+    echo "$url"
+}
+
+# Función auxiliar para leer configuración de Moodle y preconfigurar valores
+read_moodle_config() {
+    local www_dir="$1"
+    
+    log_info "🔍 Intentando detectar configuración de Moodle en: $www_dir"
+    
+    if [[ ! -f "$www_dir/config.php" ]]; then
+        log_warning "No se encontró config.php en: $www_dir"
+        return 1
+    fi
+    
+    # Verificar que es un archivo de configuración válido de Moodle
+    if ! grep -q '\$CFG.*=' "$www_dir/config.php" 2>/dev/null; then
+        log_warning "El archivo config.php no parece ser válido de Moodle"
+        return 1
+    fi
+    
+    log_success "✅ Archivo config.php encontrado y válido"
+    
+    # Usar la función principal de parsing
+    if parse_moodle_config "$www_dir/config.php" "$www_dir"; then
+        log_success "🎯 Configuración de Moodle extraída exitosamente"
+        
+        # Mostrar resumen de lo que se detectó
+        echo ""
+        echo -e "${GREEN}📋 CONFIGURACIÓN DETECTADA DESDE MOODLE:${NC}"
+        [[ -n "$DETECTED_DB_HOST" ]] && echo -e "   • Host BD: ${YELLOW}$DETECTED_DB_HOST${NC}"
+        [[ -n "$DETECTED_DB_NAME" ]] && echo -e "   • Nombre BD: ${YELLOW}$DETECTED_DB_NAME${NC}"
+        [[ -n "$DETECTED_DB_USER" ]] && echo -e "   • Usuario BD: ${YELLOW}$DETECTED_DB_USER${NC}"
+        [[ -n "$DETECTED_DB_PASS" ]] && echo -e "   • Contraseña BD: ${YELLOW}[detectada]${NC}"
+        [[ -n "$DETECTED_DATAROOT" ]] && echo -e "   • Datos Moodle: ${YELLOW}$DETECTED_DATAROOT${NC}"
+        [[ -n "$DETECTED_WWWROOT" ]] && echo -e "   • URL Moodle: ${YELLOW}$DETECTED_WWWROOT${NC}"
+        echo ""
+        
+        return 0
+    else
+        log_warning "Error parseando config.php de Moodle"
+        return 1
+    fi
+}
+
+# ===================== FUNCIÓN PARA PARSEAR CONFIG.PHP DE MOODLE =====================
+# Función para extraer configuración completa desde config.php de Moodle
+parse_moodle_config() {
+    local config_path="$1"
+    local base_dir="$2"  # Directorio base para buscar config.php si no se proporciona path
+    
+    # Variables de salida (globales)
+    DETECTED_DB_HOST=""
+    DETECTED_DB_NAME=""
+    DETECTED_DB_USER=""
+    DETECTED_DB_PASS=""
+    DETECTED_DATAROOT=""
+    DETECTED_WWWROOT=""
+    DETECTED_ADMIN_DIR=""
+    DETECTED_CONFIG_FOUND=false
+    
+    # Determinar ruta del config.php
+    local config_file=""
+    if [[ -n "$config_path" ]] && [[ -f "$config_path" ]]; then
+        config_file="$config_path"
+    elif [[ -n "$base_dir" ]] && [[ -f "$base_dir/config.php" ]]; then
+        config_file="$base_dir/config.php"
+    else
+        log_warning "No se pudo encontrar config.php en las rutas especificadas"
+        return 1
+    fi
+    
+    # Verificar que es un config.php válido de Moodle
+    if ! grep -q '\$CFG.*=' "$config_file" 2>/dev/null; then
+        log_warning "El archivo $config_file no parece ser un config.php válido de Moodle"
+        return 1
+    fi
+    
+    log_info "📋 Parseando configuración de Moodle desde: $config_file"
+    
+    # Extraer variables de configuración usando sed/grep robusto
+    # $CFG->dbhost
+    if DETECTED_DB_HOST=$(grep -E "^\s*\\\$CFG->dbhost\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_HOST" ]] && log_success "✓ Host BD detectado: $DETECTED_DB_HOST"
+    fi
+    
+    # $CFG->dbname
+    if DETECTED_DB_NAME=$(grep -E "^\s*\\\$CFG->dbname\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_NAME" ]] && log_success "✓ Nombre BD detectado: $DETECTED_DB_NAME"
+    fi
+    
+    # $CFG->dbuser
+    if DETECTED_DB_USER=$(grep -E "^\s*\\\$CFG->dbuser\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_USER" ]] && log_success "✓ Usuario BD detectado: $DETECTED_DB_USER"
+    fi
+    
+    # $CFG->dbpass (más sensible)
+    if DETECTED_DB_PASS=$(grep -E "^\s*\\\$CFG->dbpass\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DB_PASS" ]] && log_success "✓ Contraseña BD detectada: [****]"
+    fi
+    
+    # $CFG->dataroot
+    if DETECTED_DATAROOT=$(grep -E "^\s*\\\$CFG->dataroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_DATAROOT" ]] && log_success "✓ Directorio de datos detectado: $DETECTED_DATAROOT"
+    fi
+    
+    # $CFG->wwwroot (opcional, para validación)
+    if DETECTED_WWWROOT=$(grep -E "^\s*\\\$CFG->wwwroot\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_WWWROOT" ]] && log_success "✓ URL raíz detectada: $DETECTED_WWWROOT"
+    fi
+    
+    # $CFG->admin (opcional)
+    if DETECTED_ADMIN_DIR=$(grep -E "^\s*\\\$CFG->admin\s*=" "$config_file" | head -1 | sed "s/.*=\s*['\"]//;s/['\"];.*//;s/['\"].*//"); then
+        [[ -n "$DETECTED_ADMIN_DIR" ]] && log_info "✓ Directorio admin detectado: $DETECTED_ADMIN_DIR"
+    fi
+    
+    # Validar que se encontraron los datos críticos
+    if [[ -n "$DETECTED_DB_HOST" ]] && [[ -n "$DETECTED_DB_NAME" ]] && [[ -n "$DETECTED_DB_USER" ]]; then
+        DETECTED_CONFIG_FOUND=true
+        log_success "🎯 Configuración de Moodle detectada exitosamente"
+        return 0
+    else
+        log_warning "⚠️ Configuración de Moodle incompleta (faltan datos críticos)"
+        return 1
+    fi
+}
+
+# Función para buscar automáticamente config.php en directorios comunes
+auto_discover_moodle_config() {
+    local search_base="${1:-/}"  # Directorio base para búsqueda
+    local panel_user="${2:-}"    # Usuario del panel (para optimizar búsqueda)
+    
+    log_step "🔍 Buscando instalaciones de Moodle automáticamente..."
+    
+    # Variables de salida
+    DISCOVERED_CONFIG_PATHS=()
+    DISCOVERED_MOODLE_INSTALLS=()
+    
+    # Directorios candidatos según el tipo de panel y usuario
+    local search_dirs=()
+    
+    # Agregar directorios específicos del panel/usuario si están definidos
+    if [[ -n "$panel_user" ]]; then
+        case "${PANEL_TYPE:-}" in
+            "cpanel")
+                search_dirs+=(
+                    "/home/$panel_user/public_html"
+                    "/home/$panel_user/www"
+                    "/home/$panel_user/htdocs"
+                    "/home/$panel_user/domains/*/public_html"
+                    "/home/$panel_user/subdomains/*/public_html"
+                )
+                ;;
+            "plesk")
+                search_dirs+=(
+                    "/var/www/vhosts/$panel_user/httpdocs"
+                    "/var/www/vhosts/*/httpdocs"
+                    "/opt/psa/var/modules/domains/$panel_user"
+                )
+                ;;
+            "directadmin")
+                search_dirs+=(
+                    "/home/$panel_user/domains/*/public_html"
+                    "/home/$panel_user/public_html"
+                )
+                ;;
+            "hestia"|"vestacp")
+                search_dirs+=(
+                    "/home/$panel_user/web/*/public_html"
+                    "/home/$panel_user/web/*/www"
+                )
+                ;;
+            *)
+                # Directorios genéricos
+                search_dirs+=(
+                    "/var/www/html"
+                    "/var/www"
+                    "/home/$panel_user/public_html"
+                    "/home/$panel_user/www"
+                    "/home/$panel_user/htdocs"
+                )
+                ;;
+        esac
+    fi
+    
+    # Agregar directorios comunes si no se especificó usuario
+    search_dirs+=(
+        "/var/www/html"
+        "/var/www"
+        "/srv/www"
+        "/opt/lampp/htdocs"
+        "/usr/local/apache2/htdocs"
+        "/home/*/public_html"
+        "/home/*/www"
+        "/home/*/htdocs"
+    )
+    
+    # Buscar config.php en los directorios candidatos
+    local found_configs=0
+    for dir_pattern in "${search_dirs[@]}"; do
+        # Expandir wildcards si existen
+        for dir in $dir_pattern; do
+            if [[ -d "$dir" ]] && [[ -f "$dir/config.php" ]]; then
+                # Verificar que es un config.php de Moodle
+                if grep -q '\$CFG.*dbname\|\$CFG.*wwwroot' "$dir/config.php" 2>/dev/null; then
+                    DISCOVERED_CONFIG_PATHS+=("$dir/config.php")
+                    DISCOVERED_MOODLE_INSTALLS+=("$dir")
+                    found_configs=$((found_configs + 1))
+                    log_info "📁 Instalación Moodle encontrada: $dir"
+                fi
+            fi
+        done
+    done
+    
+    if [[ $found_configs -gt 0 ]]; then
+        log_success "✅ Se encontraron $found_configs instalaciones de Moodle"
+        return 0
+    else
+        log_warning "⚠️ No se encontraron instalaciones de Moodle"
+        return 1
+    fi
+}
+
+# Función para seleccionar configuración de Moodle interactivamente
+select_moodle_config_interactive() {
+    local force_search="${1:-false}"
+    
+    # Variables globales para almacenar la configuración seleccionada
+    SELECTED_CONFIG_PATH=""
+    SELECTED_WWW_DIR=""
+    
+    # Si no se fuerza la búsqueda y ya tenemos WWW_DIR definido, intentar usarlo
+    if [[ "$force_search" != "true" ]] && [[ -n "${WWW_DIR:-}" ]]; then
+        if [[ -f "$WWW_DIR/config.php" ]]; then
+            log_info "📋 Usando directorio WWW_DIR existente: $WWW_DIR"
+            if parse_moodle_config "$WWW_DIR/config.php" "$WWW_DIR"; then
+                SELECTED_CONFIG_PATH="$WWW_DIR/config.php"
+                SELECTED_WWW_DIR="$WWW_DIR"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Buscar instalaciones automáticamente
+    if auto_discover_moodle_config "/" "${PANEL_USER:-}"; then
+        echo ""
+        echo -e "${BLUE}🎯 Instalaciones de Moodle encontradas:${NC}"
+        
+        # Mostrar opciones encontradas
+        for i in "${!DISCOVERED_MOODLE_INSTALLS[@]}"; do
+            local install_dir="${DISCOVERED_MOODLE_INSTALLS[$i]}"
+            local config_path="${DISCOVERED_CONFIG_PATHS[$i]}"
+            
+            echo -e "  ${GREEN}$((i + 1)).${NC} $install_dir"
+            
+            # Mostrar información básica de cada instalación
+            if parse_moodle_config "$config_path" "$install_dir"; then
+                echo -e "     ${GRAY}• BD: ${DETECTED_DB_NAME}@${DETECTED_DB_HOST}${NC}"
+                echo -e "     ${GRAY}• URL: ${DETECTED_WWWROOT}${NC}"
+                echo -e "     ${GRAY}• Datos: ${DETECTED_DATAROOT}${NC}"
+            fi
+            echo ""
+        done
+        
+        echo -e "  ${YELLOW}0.${NC} Especificar ruta manualmente"
+        echo ""
+        
+        # Selección interactiva
+        local selection=""
+        while true; do
+            read -r -p "Seleccione una instalación [1-${#DISCOVERED_MOODLE_INSTALLS[@]}] o 0 para manual: " selection
+            
+            if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 0 ]] && [[ $selection -le ${#DISCOVERED_MOODLE_INSTALLS[@]} ]]; then
+                break
+            else
+                log_warning "Selección inválida. Ingrese un número entre 0 y ${#DISCOVERED_MOODLE_INSTALLS[@]}"
+            fi
+        done
+        
+        if [[ $selection -gt 0 ]]; then
+            # Selección de instalación detectada
+            local selected_index=$((selection - 1))
+            SELECTED_WWW_DIR="${DISCOVERED_MOODLE_INSTALLS[$selected_index]}"
+            SELECTED_CONFIG_PATH="${DISCOVERED_CONFIG_PATHS[$selected_index]}"
+            
+            log_success "✅ Instalación seleccionada: $SELECTED_WWW_DIR"
+            
+            # Parsear la configuración seleccionada
+            if parse_moodle_config "$SELECTED_CONFIG_PATH" "$SELECTED_WWW_DIR"; then
+                return 0
+            else
+                log_error "Error parseando la configuración seleccionada"
+                return 1
+            fi
+        fi
+    fi
+    
+    # Opción manual (cuando selection=0 o no se encontraron instalaciones)
+    echo ""
+    log_info "📂 Configuración manual del directorio de Moodle"
+    
+    local manual_path=""
+    while true; do
+        read -r -e -p "Ingrese la ruta completa al directorio de Moodle (donde está config.php): " manual_path
+        
+        if [[ -z "$manual_path" ]]; then
+            log_warning "La ruta no puede estar vacía"
+            continue
+        fi
+        
+        # Expandir ~ y variables
+        manual_path=$(eval echo "$manual_path")
+        
+        if [[ ! -d "$manual_path" ]]; then
+            log_warning "El directorio '$manual_path' no existe"
+            continue
+        fi
+        
+        if [[ ! -f "$manual_path/config.php" ]]; then
+            log_warning "No se encontró config.php en '$manual_path'"
+            continue
+        fi
+        
+        # Intentar parsear la configuración
+        if parse_moodle_config "$manual_path/config.php" "$manual_path"; then
+            SELECTED_WWW_DIR="$manual_path"
+            SELECTED_CONFIG_PATH="$manual_path/config.php"
+            log_success "✅ Configuración de Moodle cargada desde: $manual_path"
+            return 0
+        else
+            log_warning "Error parseando config.php en '$manual_path'. ¿Es una instalación válida de Moodle?"
+            
+            ask_yes_no "¿Desea intentar con otra ruta?" "true" "TRY_AGAIN"
+            if [[ "$TRY_AGAIN" != "true" ]]; then
+                return 1
+            fi
+        fi
+    done
 }
 
 # Función para detectar automáticamente el tipo de panel
@@ -713,32 +1538,85 @@ configure_client_interactive() {
     # Actualizar el ejemplo de ruta después de obtener el usuario
     path_example=$(get_path_examples "$PANEL_TYPE")
     
-    ask_with_default \
-        "Directorio web de Moodle:" \
-        "$path_example" \
-        "WWW_DIR" \
-        "Ruta completa al directorio donde está instalado Moodle. Se pre-completa con ruta inteligente según panel detectado" \
-        "false"
+    # NUEVA FUNCIONALIDAD: Autodetección de instalaciones de Moodle
+    echo ""
+    echo -e "${BLUE}🔍 DETECCIÓN AUTOMÁTICA DE MOODLE${NC}"
+    echo ""
     
-    # Si se proporcionó WWW_DIR, intentar leer config.php
+    ask_yes_no \
+        "¿Buscar automáticamente instalaciones de Moodle?" \
+        "true" \
+        "AUTO_DETECT_MOODLE"
+    
     local moodle_config_loaded="false"
-    if [[ -n "$WWW_DIR" ]] && [[ -d "$WWW_DIR" ]]; then
-        if read_moodle_config "$WWW_DIR"; then
+    if [[ "$AUTO_DETECT_MOODLE" == "true" ]]; then
+        # Intentar detectar automáticamente instalaciones de Moodle
+        if select_moodle_config_interactive "false"; then
+            # Se seleccionó una instalación automáticamente
+            WWW_DIR="$SELECTED_WWW_DIR"
             moodle_config_loaded="true"
-            # Si se cargó la configuración de Moodle, usar valores detectados como predeterminados
-            if [[ -n "$DETECTED_MOODLEDATA" ]]; then
-                MOODLEDATA_DIR="$DETECTED_MOODLEDATA"
-                log_success "✓ MOODLEDATA_DIR = $MOODLEDATA_DIR (desde config.php)"
+            
+            log_success "✅ Instalación de Moodle autodetectada y configurada"
+            echo -e "${GREEN}   • Directorio web: ${YELLOW}$WWW_DIR${NC}"
+            
+            # Preconfigurar valores desde config.php detectado
+            if [[ -n "$DETECTED_DATAROOT" ]]; then
+                MOODLEDATA_DIR="$DETECTED_DATAROOT"
+                echo -e "${GREEN}   • Directorio datos: ${YELLOW}$MOODLEDATA_DIR${NC}"
             fi
             
             # Extraer dominio de la URL si no se especificó
             if [[ -z "$DOMAIN_NAME" ]] && [[ -n "$DETECTED_WWWROOT" ]]; then
                 local extracted_domain=$(extract_domain_from_url "$DETECTED_WWWROOT")
                 echo ""
-                read -r -p "¿Usar dominio extraído de Moodle ($extracted_domain)? [Y/n]: " use_extracted_domain
-                if [[ -z "$use_extracted_domain" ]] || [[ "$use_extracted_domain" =~ ^[Yy] ]]; then
+                ask_yes_no \
+                    "¿Usar dominio extraído de config.php ($extracted_domain)?" \
+                    "true" \
+                    "USE_EXTRACTED_DOMAIN"
+                
+                if [[ "$USE_EXTRACTED_DOMAIN" == "true" ]]; then
                     DOMAIN_NAME="$extracted_domain"
-                    log_success "✓ DOMAIN_NAME = $DOMAIN_NAME (extraído de Moodle)"
+                    echo -e "${GREEN}   • Dominio: ${YELLOW}$DOMAIN_NAME${NC}"
+                fi
+            fi
+        else
+            log_warning "No se pudo autodetectar Moodle. Continuando con configuración manual..."
+        fi
+    fi
+    
+    # Si no se autodetectó, preguntar manualmente
+    if [[ "$moodle_config_loaded" != "true" ]]; then
+        ask_with_default \
+            "Directorio web de Moodle:" \
+            "$path_example" \
+            "WWW_DIR" \
+            "Ruta completa al directorio donde está instalado Moodle. Se pre-completa con ruta inteligente según panel detectado" \
+            "false"
+        
+        # Si se proporcionó WWW_DIR manualmente, intentar leer config.php
+        if [[ -n "$WWW_DIR" ]] && [[ -d "$WWW_DIR" ]]; then
+            if read_moodle_config "$WWW_DIR"; then
+                moodle_config_loaded="true"
+                
+                # Preconfigurar valores desde config.php detectado
+                if [[ -n "$DETECTED_DATAROOT" ]]; then
+                    MOODLEDATA_DIR="$DETECTED_DATAROOT"
+                    log_success "✓ MOODLEDATA_DIR = $MOODLEDATA_DIR (desde config.php)"
+                fi
+                
+                # Extraer dominio de la URL si no se especificó
+                if [[ -z "$DOMAIN_NAME" ]] && [[ -n "$DETECTED_WWWROOT" ]]; then
+                    local extracted_domain=$(extract_domain_from_url "$DETECTED_WWWROOT")
+                    echo ""
+                    ask_yes_no \
+                        "¿Usar dominio extraído de config.php ($extracted_domain)?" \
+                        "true" \
+                        "USE_EXTRACTED_DOMAIN_MANUAL"
+                    
+                    if [[ "$USE_EXTRACTED_DOMAIN_MANUAL" == "true" ]]; then
+                        DOMAIN_NAME="$extracted_domain"
+                        log_success "✓ DOMAIN_NAME = $DOMAIN_NAME (extraído de Moodle)"
+                    fi
                 fi
             fi
         fi
@@ -775,7 +1653,16 @@ configure_client_interactive() {
         default_db_name="$DETECTED_DB_NAME"
         default_db_user="$DETECTED_DB_USER"
         
-        log_info "Usando configuración detectada de Moodle como valores predeterminados"
+        log_info "✅ Usando configuración detectada de config.php como valores predeterminados"
+        echo ""
+        echo -e "${GREEN}VALORES DETECTADOS DESDE CONFIG.PHP:${NC}"
+        echo -e "   • Host: ${YELLOW}$default_db_host${NC}"
+        echo -e "   • Base de datos: ${YELLOW}$default_db_name${NC}"
+        echo -e "   • Usuario: ${YELLOW}$default_db_user${NC}"
+        [[ -n "$DETECTED_DB_PASS" ]] && echo -e "   • Contraseña: ${YELLOW}[detectada]${NC}"
+        echo ""
+        echo -e "${CYAN}Puede confirmar estos valores o modificarlos según necesite:${NC}"
+        echo ""
     fi
     
     ask_with_default \
@@ -788,15 +1675,15 @@ configure_client_interactive() {
         "Nombre de la base de datos:" \
         "$default_db_name" \
         "DB_NAME" \
-        "Nombre de la base de datos de Moodle. Se detectará desde config.php si se deja vacío" \
-        "false"
+        "Nombre de la base de datos de Moodle" \
+        "true"
     
     ask_with_default \
         "Usuario de la base de datos:" \
         "$default_db_user" \
         "DB_USER" \
-        "Usuario para conectar a la base de datos. Se detectará desde config.php si se deja vacío" \
-        "false"
+        "Usuario para conectar a la base de datos" \
+        "true"
     
     echo ""
     echo -e "${BLUE}¿Desea configurar la contraseña de la base de datos ahora?${NC}"
@@ -804,7 +1691,11 @@ configure_client_interactive() {
     echo "  1. Variable de entorno (MÁS SEGURO)"
     echo "  2. Archivo protegido /etc/mysql/backup.pwd (RECOMENDADO)"
     echo "  3. Ingresar ahora en texto plano (MENOS SEGURO)"
-    echo "  4. Auto-detectar desde config.php (RECOMENDADO)"
+    if [[ "$moodle_config_loaded" == "true" ]] && [[ -n "$DETECTED_DB_PASS" ]]; then
+        echo "  4. Usar contraseña detectada desde config.php (RECOMENDADO)"
+    else
+        echo "  4. Auto-detectar desde config.php durante ejecución"
+    fi
     echo ""
     
     local default_option="4"
@@ -813,7 +1704,7 @@ configure_client_interactive() {
         default_option="4"
     fi
     
-    read -r -p "Seleccione opción [1-4] ($default_option para auto-detección): " db_option
+    read -r -p "Seleccione opción [1-4] ($default_option para usar detectada): " db_option
     
     if [[ -z "$db_option" ]]; then
         db_option="$default_option"
