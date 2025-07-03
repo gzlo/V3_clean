@@ -5,6 +5,78 @@ Todos los cambios importantes de este proyecto se documentan en este archivo.
 El formato está basado en [Keep a Changelog](https://keepachangelog.com/es/1.0.0/),
 y este proyecto se adhiere al [Versionado Semántico](https://semver.org/lang/es/).
 
+## [3.3.0] - 2025-01-17
+
+### 🚀 Detección de Paneles Ampliada y Mejoras de UX
+
+#### ✨ Nuevos Paneles Soportados
+- **CyberPanel**: Detección completa con auto-detección de directorios
+- **Hestia Control Panel**: Soporte completo con rutas automáticas
+- **VestaCP**: Detección mejorada y auto-detección de directorios
+- **Docker**: Detección de contenedores con mapeo de volúmenes
+- **Apache Manual**: Detección de instalaciones con Apache nativo
+- **Nginx Manual**: Detección de instalaciones con Nginx nativo  
+- **LiteSpeed Manual**: Detección de instalaciones con LiteSpeed nativo
+
+#### 🎯 Placeholders Inteligentes Avanzados
+- **Detección de dominio real**: Los placeholders usan el dominio detectado del sistema
+- **Usuario específico por panel**: Cada panel genera placeholders con su usuario típico
+- **Rutas específicas por servidor**: Ejemplos adaptativos según Apache, Nginx o LiteSpeed
+- **Fallbacks robustos**: Sistema inteligente de valores por defecto
+
+#### 🧭 Navegación y Edición Mejorada
+- **Soporte completo de readline**: `read -e -i` para edición avanzada de campos
+- **Ayuda visual**: Indicaciones sobre navegación con flechas y atajos de teclado
+- **Colores mejorados**: Mejor contraste y legibilidad en los prompts
+- **Edición de línea completa**: Ctrl+A, Ctrl+E, Ctrl+U, flechas ← →
+
+#### 🔧 Funciones de Auto-Detección Ampliadas
+- `auto_detect_directories_hestia()`: Detección específica para Hestia
+- `auto_detect_directories_cyberpanel()`: Detección específica para CyberPanel
+- `auto_detect_directories_docker()`: Detección de volúmenes Docker
+- `auto_detect_directories_apache()`: Detección para Apache manual
+- `auto_detect_directories_nginx()`: Detección para Nginx manual
+- `auto_detect_directories_litespeed()`: Detección para LiteSpeed manual
+
+#### 🧪 Tests Automatizados Ampliados
+- **Cobertura completa**: Tests para todos los paneles y placeholders
+- **Validación de UX**: Tests específicos para navegación y edición
+- **Suite robusta**: 8 tests automatizados que cubren todos los casos
+- **Verificación de detección**: Tests para cada función de auto-detección
+
+#### 📝 Mejoras Técnicas
+- **Detección robusta de paneles**: Algoritmo mejorado con múltiples verificaciones
+- **Usuario real en placeholders**: Detección inteligente del usuario actual del sistema
+- **Manejo de errores mejorado**: Validaciones y fallbacks más robustos
+- **Compatibilidad ampliada**: Soporte para más configuraciones de servidor
+
+## [3.2.1] - 2025-07-02
+
+### 🎨 Mejoras de Interfaz de Usuario
+
+#### ✨ Placeholders Inteligentes
+- **Auto-detección de usuario**: Los placeholders ahora incluyen el usuario real del sistema (ej: `/home/dev4hc/public_html` en lugar de `/home/usuario/public_html`)
+- **Rutas pre-completadas**: El directorio de Moodle se pre-completa con la ruta más probable según el panel y usuario detectado
+- **Ejemplos dinámicos mejorados**: Los ejemplos de rutas se actualizan después de obtener el usuario del panel
+
+#### 🧭 Navegación con Flechas Mejorada
+- **Soporte completo de readline**: Agregado `read -e` para habilitar navegación con flechas ← → 
+- **Edición de línea avanzada**: Soporte para Ctrl+A (inicio), Ctrl+E (fin), Ctrl+U (limpiar línea)
+- **Valor por defecto editable**: Los valores por defecto se cargan directamente en el campo editable con `read -i`
+- **Ayuda de navegación**: Texto informativo sobre cómo usar las funciones de edición
+
+#### 🔧 Funcionalidades Técnicas
+- **Función `auto_detect_current_user()`**: Detecta inteligentemente el usuario del sistema actual
+- **Función `get_path_examples()` mejorada**: Genera ejemplos usando información real del entorno
+- **Fallback robusto**: Manejo adecuado cuando no se puede detectar el usuario (fallback a "usuario")
+- **Tests automatizados**: Suite de 8 tests para validar todas las mejoras de UI
+
+#### 📝 Detalles de Implementación
+- **Soporte de sudo**: Detecta el usuario real cuando se ejecuta con sudo
+- **Detección de usuarios de hosting**: Busca automáticamente usuarios con directorios `public_html`
+- **Placeholders específicos por panel**: Cada tipo de panel genera ejemplos apropiados para su estructura
+- **Validación de entradas**: Mantiene toda la validación existente mientras mejora la experiencia
+
 ## [3.2.0] - 2025-07-02
 
 ### 🐛 Correcciones Críticas

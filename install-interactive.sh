@@ -15,6 +15,7 @@ BLUE='\033[0;34m'
 PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 WHITE='\033[1;37m'
+GRAY='\033[0;37m'
 NC='\033[0m'
 BOLD='\033[1m'
 
@@ -125,7 +126,7 @@ detect_server_capabilities() {
     echo ""
 }
 
-# Función para preguntar con valor por defecto
+# Función para preguntar con valor por defecto con soporte completo de edición
 ask_with_default() {
     local prompt="$1"
     local default="$2"
@@ -137,18 +138,27 @@ ask_with_default() {
     echo -e "${BLUE}$description${NC}"
     echo -e "${CYAN}$prompt${NC}"
     
+    local value=""
+    
     if [[ -n "$default" ]]; then
         echo -e "${YELLOW}Valor por defecto: $default${NC}"
-        read -r -p "Ingrese valor (Enter para usar por defecto): " value
+        echo -e "${GRAY}(Usa las flechas ← → para navegar, Ctrl+A/E para inicio/fin)${NC}"
+        
+        # Usar readline con soporte completo de edición y valor por defecto
+        read -r -e -i "$default" -p "Ingrese valor: " value
+        
+        # Si el usuario borró todo y presionó Enter, usar el valor por defecto
         if [[ -z "$value" ]]; then
             value="$default"
         fi
     else
-        read -r -p "Ingrese valor: " value
+        echo -e "${GRAY}(Usa las flechas ← → para navegar, Ctrl+A/E para inicio/fin)${NC}"
+        read -r -e -p "Ingrese valor: " value
+        
         if [[ "$required" == "true" ]]; then
             while [[ -z "$value" ]]; do
                 log_warning "Este campo es obligatorio"
-                read -r -p "Ingrese valor: " value
+                read -r -e -p "Ingrese valor: " value
             done
         fi
     fi
@@ -226,33 +236,123 @@ detect_control_panel() {
     # Detectar silenciosamente - sin mostrar logs
     
     # Verificar cPanel
-    if [[ -d "/usr/local/cpanel" ]] || [[ -f "/usr/local/cpanel/cpanel" ]]; then
+    if [[ -d "/usr/local/cpanel" ]] || [[ -f "/usr/local/cpanel/cpanel" ]] || [[ -f "/etc/cpanel.config" ]]; then
         echo "cpanel"
         return 0
     fi
     
     # Verificar Plesk
-    if [[ -d "/opt/psa" ]] || [[ -f "/usr/local/psa/version" ]]; then
+    if [[ -d "/opt/psa" ]] || [[ -f "/usr/local/psa/version" ]] || [[ -f "/etc/psa/.psa.shadow" ]]; then
         echo "plesk"
         return 0
     fi
     
     # Verificar DirectAdmin
-    if [[ -d "/usr/local/directadmin" ]] || [[ -f "/usr/local/directadmin/directadmin" ]]; then
+    if [[ -d "/usr/local/directadmin" ]] || [[ -f "/usr/local/directadmin/directadmin" ]] || [[ -f "/etc/directadmin.conf" ]]; then
         echo "directadmin"
         return 0
     fi
     
-    # Verificar VestaCP
+    # Verificar Hestia (evolución de VestaCP)
+    if [[ -d "/usr/local/hestia" ]] || [[ -f "/usr/local/hestia/bin/v-list-users" ]] || command -v v-list-users >/dev/null 2>&1; then
+        echo "hestia"
+        return 0
+    fi
+    
+    # Verificar VestaCP (legacy)
     if [[ -d "/usr/local/vesta" ]] || [[ -f "/usr/local/vesta/bin/v-list-users" ]]; then
         echo "vestacp"
         return 0
     fi
     
+    # Verificar CyberPanel
+    if [[ -d "/usr/local/CyberCP" ]] || [[ -f "/usr/local/lsws/bin/openlitespeed" ]] || command -v cyberpanel >/dev/null 2>&1; then
+        echo "cyberpanel"
+        return 0
+    fi
+    
     # Verificar ISPConfig
-    if [[ -d "/usr/local/ispconfig" ]] || [[ -f "/usr/local/ispconfig/server/server.sh" ]]; then
+    if [[ -d "/usr/local/ispconfig" ]] || [[ -f "/usr/local/ispconfig/server/server.sh" ]] || [[ -f "/etc/ispconfig.conf" ]]; then
         echo "ispconfig"
         return 0
+    fi
+    
+    # Verificar instalaciones Docker
+    if command -v docker >/dev/null 2>&1; then
+        # Buscar contenedores de Moodle activos
+        if docker ps --format "table {{.Names}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            echo "docker"
+            return 0
+        fi
+        # Buscar volúmenes de Moodle
+        if docker volume ls --format "table {{.Name}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            echo "docker"
+            return 0
+        fi
+    fi
+    
+    # Verificar instalación manual con Apache
+    if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
+        # Buscar configuraciones típicas de Apache con Moodle
+        local apache_configs=(
+            "/etc/apache2/sites-enabled"
+            "/etc/apache2/sites-available"
+            "/etc/httpd/conf.d"
+            "/usr/local/apache2/conf"
+        )
+        
+        for config_dir in "${apache_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "*.conf" -exec grep -l "moodle\|DocumentRoot.*www" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "apache"
+                    return 0
+                fi
+            fi
+        done
+    fi
+    
+    # Verificar instalación manual con Nginx
+    if command -v nginx >/dev/null 2>&1; then
+        # Buscar configuraciones típicas de Nginx con Moodle
+        local nginx_configs=(
+            "/etc/nginx/sites-enabled"
+            "/etc/nginx/sites-available"
+            "/etc/nginx/conf.d"
+            "/usr/local/nginx/conf"
+        )
+        
+        for config_dir in "${nginx_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "*.conf" -o -name "*" -exec grep -l "moodle\|root.*www\|root.*var" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "nginx"
+                    return 0
+                fi
+            fi
+        done
+    fi
+    
+    # Verificar instalación manual con LiteSpeed
+    if command -v litespeed >/dev/null 2>&1 || [[ -f "/usr/local/lsws/bin/lshttpd" ]] || [[ -d "/usr/local/lsws" ]]; then
+        # Buscar configuraciones típicas de LiteSpeed con Moodle
+        local litespeed_configs=(
+            "/usr/local/lsws/conf"
+            "/usr/local/lsws/Example/html"
+        )
+        
+        for config_dir in "${litespeed_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "httpd_config.conf" -o -name "*.conf" -exec grep -l "moodle\|docRoot.*www\|docRoot.*var" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    echo "litespeed"
+                    return 0
+                fi
+            fi
+        done
+        
+        # También buscar en directorios típicos de LiteSpeed
+        if [[ -d "/usr/local/lsws/Example/html" ]] && find /usr/local/lsws/Example/html -name "config.php" -exec grep -l "moodle\|Moodle" {} \; 2>/dev/null | head -1 >/dev/null; then
+            echo "litespeed"
+            return 0
+        fi
     fi
     
     # No se detectó ningún panel conocido
@@ -260,28 +360,57 @@ detect_control_panel() {
     return 1
 }
 
-# Función para obtener ejemplos de rutas según el panel
+# Función para obtener ejemplos de rutas según el panel con información real del usuario
 get_path_examples() {
     local panel_type="$1"
+    local user="${PANEL_USER:-$(auto_detect_current_user)}"
+    local domain="${DOMAIN_NAME:-dominio.com}"
+    
+    # Si no tenemos usuario válido, usar genérico
+    if [[ -z "$user" ]] || [[ "$user" == "root" ]]; then
+        user="usuario"
+    fi
     
     case "$panel_type" in
         "cpanel")
-            echo "/home/usuario/public_html"
+            echo "/home/$user/public_html"
             ;;
         "plesk")
-            echo "/var/www/vhosts/dominio.com/httpdocs"
+            echo "/var/www/vhosts/$domain/httpdocs"
             ;;
         "directadmin")
-            echo "/home/usuario/domains/dominio.com/public_html"
+            echo "/home/$user/domains/$domain/public_html"
+            ;;
+        "hestia")
+            echo "/home/$user/web/$domain/public_html"
             ;;
         "vestacp")
-            echo "/home/usuario/web/dominio.com/public_html"
+            echo "/home/$user/web/$domain/public_html"
+            ;;
+        "cyberpanel")
+            echo "/home/$domain/public_html"
             ;;
         "ispconfig")
-            echo "/var/www/clients/client1/web1/web"
+            if [[ "$domain" != "dominio.com" ]]; then
+                echo "/var/www/$domain/web"
+            else
+                echo "/var/www/clients/client1/web1/web"
+            fi
+            ;;
+        "docker")
+            echo "/var/lib/docker/volumes/moodle_data/_data o /opt/moodle"
+            ;;
+        "apache")
+            echo "/var/www/html o /var/www/$domain"
+            ;;
+        "nginx")
+            echo "/var/www/html o /usr/share/nginx/html"
+            ;;
+        "litespeed")
+            echo "/usr/local/lsws/Example/html o /var/www/html"
             ;;
         *)
-            echo "/var/www/html o /home/usuario/public_html"
+            echo "/var/www/html o /home/$user/public_html"
             ;;
     esac
 }
@@ -345,6 +474,33 @@ extract_domain_from_url() {
     echo "$url" | sed 's|https\?://||' | sed 's|/.*||' | sed 's|:.*||'
 }
 
+# Función para auto-detectar el usuario del sistema actual
+auto_detect_current_user() {
+    local current_user="$USER"
+    
+    # Si estamos ejecutando como root, intentar detectar el usuario real
+    if [[ "$current_user" == "root" ]] && [[ -n "${SUDO_USER:-}" ]]; then
+        current_user="$SUDO_USER"
+    fi
+    
+    # Si aún es root, intentar detectar usuarios comunes de paneles
+    if [[ "$current_user" == "root" ]]; then
+        # Buscar usuarios con directorios home típicos de hosting
+        for user_dir in /home/*; do
+            if [[ -d "$user_dir" ]]; then
+                local user=$(basename "$user_dir")
+                # Evitar usuarios del sistema
+                if [[ ! "$user" =~ ^(lost\+found|.*)$ ]] && [[ -d "$user_dir/public_html" ]]; then
+                    current_user="$user"
+                    break
+                fi
+            fi
+        done
+    fi
+    
+    echo "$current_user"
+}
+
 # Función para configurar un cliente paso a paso
 configure_client_interactive() {
     local client_number="$1"
@@ -403,14 +559,14 @@ configure_client_interactive() {
                 "Tipo de panel de control del servidor:" \
                 "$detected_panel" \
                 "PANEL_TYPE" \
-                "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+                "Valores válidos: auto, cpanel, plesk, directadmin, hestia, vestacp, cyberpanel, ispconfig, docker, apache, nginx, litespeed, manual"
         fi
     else
         ask_with_default \
             "Tipo de panel de control del servidor:" \
             "auto" \
             "PANEL_TYPE" \
-            "Valores válidos: auto, cpanel, plesk, directadmin, vestacp, ispconfig, manual"
+            "Valores válidos: auto, cpanel, plesk, directadmin, hestia, vestacp, cyberpanel, ispconfig, docker, apache, nginx, litespeed, manual"
     fi
     
     ask_yes_no \
@@ -488,6 +644,62 @@ configure_client_interactive() {
                 "Nombre de usuario de DirectAdmin" \
                 "false"
             ;;
+        "hestia")
+            ask_with_default \
+                "Usuario de Hestia:" \
+                "" \
+                "PANEL_USER" \
+                "Nombre de usuario en Hestia Control Panel" \
+                "false"
+            ;;
+        "vestacp")
+            ask_with_default \
+                "Usuario de VestaCP:" \
+                "" \
+                "PANEL_USER" \
+                "Nombre de usuario en VestaCP (legacy)" \
+                "false"
+            ;;
+        "cyberpanel")
+            ask_with_default \
+                "Dominio en CyberPanel:" \
+                "$DOMAIN_NAME" \
+                "PANEL_USER" \
+                "En CyberPanel se organiza por dominios. Usar el dominio principal" \
+                "false"
+            ;;
+        "docker")
+            ask_with_default \
+                "Nombre del contenedor o usuario:" \
+                "moodle" \
+                "PANEL_USER" \
+                "Nombre del contenedor Docker o usuario del sistema host" \
+                "false"
+            ;;
+        "apache")
+            ask_with_default \
+                "Usuario del servidor web:" \
+                "www-data" \
+                "PANEL_USER" \
+                "Usuario bajo el cual corre Apache (www-data, apache, httpd)" \
+                "false"
+            ;;
+        "nginx")
+            ask_with_default \
+                "Usuario del servidor web:" \
+                "www-data" \
+                "PANEL_USER" \
+                "Usuario bajo el cual corre Nginx (www-data, nginx)" \
+                "false"
+            ;;
+        "litespeed")
+            ask_with_default \
+                "Usuario del servidor web:" \
+                "nobody" \
+                "PANEL_USER" \
+                "Usuario bajo el cual corre LiteSpeed (nobody, lsws)" \
+                "false"
+            ;;
         *)
             ask_with_default \
                 "Usuario del sistema:" \
@@ -498,11 +710,14 @@ configure_client_interactive() {
             ;;
     esac
     
+    # Actualizar el ejemplo de ruta después de obtener el usuario
+    path_example=$(get_path_examples "$PANEL_TYPE")
+    
     ask_with_default \
-        "Directorio web de Moodle (ejemplo: $path_example):" \
-        "" \
+        "Directorio web de Moodle:" \
+        "$path_example" \
         "WWW_DIR" \
-        "Ruta completa al directorio donde está instalado Moodle. Se intentará auto-detectar si se deja vacío" \
+        "Ruta completa al directorio donde está instalado Moodle. Se pre-completa con ruta inteligente según panel detectado" \
         "false"
     
     # Si se proporcionó WWW_DIR, intentar leer config.php

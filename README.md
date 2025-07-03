@@ -1,11 +1,47 @@
 # 🚀 Moodle Backup V3 - Sistema Multi-Cliente Mejorado
 
-[![Version](https://img.shields.io/badge/version-3.2.0-blue.svg)](https://github.com/gzlo/moodle-backup)
+[![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)](https://github.com/gzlo/moodle-backup)
 [![Shell](https://img.shields.io/badge/shell-bash-green.svg)](https://www.gnu.org/software/bash/)
 [![License](https://img.shields.io/badge/license-MIT-orange.svg)](LICENSE)
-[![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Manual-blue.svg)](#-paneles-soportados)
+[![Panel Support](https://img.shields.io/badge/panels-cPanel%20%7C%20Plesk%20%7C%20DirectAdmin%20%7C%20VestaCP%20%7C%20Hestia%20%7C%20CyberPanel%20%7C%20Docker%20%7C%20Manual-blue.svg)](#-paneles-soportados)
 
 Sistema avanzado de backup para Moodle con **configuración interactiva inteligente**, **auto-detección de paneles** y **lectura automática de config.php**. Diseñado para funcionar en cualquier entorno con una experiencia de usuario completamente renovada.
+
+## 🆕 Novedades de la Versión 3.3.0
+
+### 🚀 Detección de Paneles Ampliada
+- **Nuevos paneles soportados**: CyberPanel, Hestia, VestaCP (mejorado), Docker, Apache/Nginx/LiteSpeed manual
+- **Auto-detección robusta**: Algoritmo mejorado que detecta más configuraciones de servidor
+- **Placeholders inteligentes avanzados**: Usan el dominio y usuario real detectado del sistema
+- **Tests automatizados**: Suite completa de 8 tests para validar todas las mejoras
+
+### 🎯 Experiencia de Usuario Mejorada
+- **Navegación con flechas completa**: Edición avanzada de texto con `read -e -i`
+- **Placeholders específicos por panel**: Cada panel genera ejemplos apropiados para su estructura
+- **Detección de usuario real**: Los ejemplos usan el usuario actual en lugar de "usuario" genérico
+- **Ayuda visual**: Instrucciones de navegación mostradas durante la entrada de datos
+
+### 🔧 Funciones Técnicas Nuevas
+- `auto_detect_directories_hestia()`: Para Hestia Control Panel
+- `auto_detect_directories_cyberpanel()`: Para CyberPanel
+- `auto_detect_directories_docker()`: Para contenedores Docker
+- `auto_detect_directories_apache()`: Para Apache manual
+- `auto_detect_directories_nginx()`: Para Nginx manual
+- `auto_detect_directories_litespeed()`: Para LiteSpeed manual
+
+## 🆕 Novedades de la Versión 3.2.1
+
+### 🎨 Interfaz de Usuario Mejorada
+- **Placeholders inteligentes** que muestran rutas reales (ej: `/home/dev4hc/public_html`)
+- **Navegación con flechas** completa para editar texto con readline
+- **Valores pre-completados** en campos de entrada para mejor experiencia
+- **Auto-detección de usuario** del sistema actual para ejemplos precisos
+
+### 🧭 Navegación Avanzada
+- **Soporte completo de edición**: Usa flechas ← → para moverte por el texto
+- **Atajos de teclado**: Ctrl+A (inicio), Ctrl+E (fin), Ctrl+U (limpiar)
+- **Edición in-situ**: Los valores por defecto se cargan directamente en el editor
+- **Ayuda visual**: Instrucciones de navegación mostradas al usuario
 
 ## 🆕 Novedades de la Versión 3.2
 
@@ -66,10 +102,19 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh 
 ¿Usar esta configuración detectada? [Y/n]: Y
 ```
 
-### 3. Configuración Simplificada
-- Solo se pregunta por campos que no se pueden detectar
-- Ejemplos dinámicos según el panel detectado
-- Validación inteligente de campos obligatorios
+### 3. Configuración Simplificada e Inteligente
+- **Placeholders inteligentes**: Rutas pre-completadas con información real del sistema
+- **Navegación avanzada**: Edición completa con flechas y atajos de teclado  
+- **Solo campos necesarios**: Se pregunta únicamente por campos que no se pueden detectar
+- **Ejemplos dinámicos**: Cambian según el panel y usuario detectado
+- **Validación inteligente**: Campos obligatorios según el contexto
+
+#### 💡 Ejemplo de Placeholder Inteligente
+```
+Directorio web de Moodle:
+(Usa las flechas ← → para navegar, Ctrl+A/E para inicio/fin)
+Ingrese valor: /home/dev4hc/public_html  # ← Pre-completado con usuario real
+```
 
 ### 1. Detección del Servidor
 El sistema detecta automáticamente:
@@ -194,8 +239,14 @@ mb help              # Ayuda completa del sistema
 | **cPanel**           |       ✅        |       ✅       | Completo |
 | **Plesk**            |       ✅        |       ✅       | Completo |
 | **DirectAdmin**      |       ✅        |       ✅       | Completo |
-| **VestaCP/HestiaCP** |       ✅        |       ✅       | Completo |
+| **VestaCP**          |       ✅        |       ✅       | Completo |
+| **Hestia**           |       ✅        |       ✅       | Completo |
+| **CyberPanel**       |       ✅        |       ✅       | Completo |
 | **ISPConfig**        |       ✅        |       ✅       | Completo |
+| **Docker**           |       ✅        |       ✅       | Completo |
+| **Apache Manual**    |       ✅        |       ✅       | Completo |
+| **Nginx Manual**     |       ✅        |       ✅       | Completo |
+| **LiteSpeed Manual** |       ✅        |       ✅       | Completo |
 | **Manual**           |       ✅        |       ✅       | Completo |
 
 ## � Estructura de Archivos

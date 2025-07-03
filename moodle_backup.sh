@@ -178,10 +178,24 @@ detect_panel_type() {
         return 0
     fi
     
-    # Detectar VestaCP/HestiaCP
-    if [[ -d "/usr/local/vesta" ]] || [[ -d "/usr/local/hestia" ]] || command -v v-list-users >/dev/null 2>&1; then
+    # Detectar Hestia (evolución de VestaCP)
+    if [[ -d "/usr/local/hestia" ]] || [[ -f "/usr/local/hestia/bin/v-list-users" ]] || command -v v-list-users >/dev/null 2>&1; then
+        PANEL_TYPE="hestia"
+        basic_log_info "Detectado: Hestia Control Panel"
+        return 0
+    fi
+    
+    # Detectar VestaCP (legacy)
+    if [[ -d "/usr/local/vesta" ]] || [[ -f "/usr/local/vesta/bin/v-list-users" ]]; then
         PANEL_TYPE="vestacp"
-        basic_log_info "Detectado: VestaCP/HestiaCP"
+        basic_log_info "Detectado: VestaCP (legacy)"
+        return 0
+    fi
+    
+    # Detectar CyberPanel
+    if [[ -d "/usr/local/CyberCP" ]] || [[ -f "/usr/local/lsws/bin/openlitespeed" ]] || command -v cyberpanel >/dev/null 2>&1; then
+        PANEL_TYPE="cyberpanel"
+        basic_log_info "Detectado: CyberPanel"
         return 0
     fi
     
@@ -190,6 +204,62 @@ detect_panel_type() {
         PANEL_TYPE="ispconfig"
         basic_log_info "Detectado: ISPConfig"
         return 0
+    fi
+    
+    # Detectar instalaciones Docker
+    if command -v docker >/dev/null 2>&1; then
+        if docker ps --format "table {{.Names}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            PANEL_TYPE="docker"
+            basic_log_info "Detectado: Instalación Docker con contenedores Moodle"
+            return 0
+        fi
+        if docker volume ls --format "table {{.Name}}" 2>/dev/null | grep -i moodle >/dev/null 2>&1; then
+            PANEL_TYPE="docker"
+            basic_log_info "Detectado: Instalación Docker con volúmenes Moodle"
+            return 0
+        fi
+    fi
+    
+    # Detectar instalación manual con Apache
+    if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
+        PANEL_TYPE="apache"
+        basic_log_info "Detectado: Apache (instalación manual)"
+        return 0
+    fi
+    
+    # Detectar instalación manual con Nginx
+    if command -v nginx >/dev/null 2>&1; then
+        PANEL_TYPE="nginx"
+        basic_log_info "Detectado: Nginx (instalación manual)"
+        return 0
+    fi
+    
+    # Detectar instalación manual con LiteSpeed
+    if command -v litespeed >/dev/null 2>&1 || [[ -f "/usr/local/lsws/bin/lshttpd" ]] || [[ -d "/usr/local/lsws" ]]; then
+        PANEL_TYPE="litespeed"
+        basic_log_info "Detectado: LiteSpeed (instalación manual)"
+        return 0
+    fi
+    fi
+    
+    # Detectar instalación manual con Apache
+    if command -v apache2 >/dev/null 2>&1 || command -v httpd >/dev/null 2>&1; then
+        local apache_configs=(
+            "/etc/apache2/sites-enabled"
+            "/etc/apache2/sites-available"
+            "/etc/httpd/conf.d"
+            "/usr/local/apache2/conf"
+        )
+        
+        for config_dir in "${apache_configs[@]}"; do
+            if [[ -d "$config_dir" ]]; then
+                if find "$config_dir" -name "*.conf" -exec grep -l "moodle\|DocumentRoot.*www" {} \; 2>/dev/null | head -1 >/dev/null; then
+                    PANEL_TYPE="apache"
+                    basic_log_info "Detectado: Instalación manual con Apache"
+                    return 0
+                fi
+            fi
+        done
     fi
     
     # Si no se detecta ningún panel
@@ -252,11 +322,38 @@ auto_detect_user() {
                 basic_log_info "Auto-detectado usuario Plesk: $PANEL_USER"
             fi
             ;;
-        "directadmin"|"vestacp"|"ispconfig")
+        "directadmin"|"hestia"|"vestacp"|"ispconfig")
             if [[ -n "${USER:-}" ]] && [[ "$USER" != "root" ]]; then
                 PANEL_USER="$USER"
                 basic_log_info "Auto-detectado usuario ${PANEL_TYPE}: $PANEL_USER"
             fi
+            ;;
+        "cyberpanel")
+            # En CyberPanel se organiza por dominios
+            if [[ -n "${DOMAIN_NAME:-}" ]]; then
+                PANEL_USER="$DOMAIN_NAME"
+                basic_log_info "Auto-detectado dominio CyberPanel: $PANEL_USER"
+            fi
+            ;;
+        "docker")
+            # Para Docker, intentar detectar contenedores Moodle
+            if command -v docker >/dev/null 2>&1; then
+                local moodle_container=$(docker ps --format "{{.Names}}" | grep -i moodle | head -1)
+                if [[ -n "$moodle_container" ]]; then
+                    PANEL_USER="$moodle_container"
+                    basic_log_info "Auto-detectado contenedor Docker: $PANEL_USER"
+                fi
+            fi
+            ;;
+        "apache")
+            # Para Apache manual, usar usuario web común
+            for web_user in "www-data" "apache" "httpd" "nginx"; do
+                if id "$web_user" >/dev/null 2>&1; then
+                    PANEL_USER="$web_user"
+                    basic_log_info "Auto-detectado usuario web Apache: $PANEL_USER"
+                    break
+                fi
+            done
             ;;
         "manual")
             basic_log_warn "Instalación manual detectada - Usuario puede no ser relevante"
@@ -282,11 +379,29 @@ auto_detect_directories() {
         "directadmin")
             auto_detect_directories_directadmin
             ;;
+        "hestia")
+            auto_detect_directories_hestia
+            ;;
         "vestacp")
             auto_detect_directories_vestacp
             ;;
+        "cyberpanel")
+            auto_detect_directories_cyberpanel
+            ;;
         "ispconfig")
             auto_detect_directories_ispconfig
+            ;;
+        "docker")
+            auto_detect_directories_docker
+            ;;
+        "apache")
+            auto_detect_directories_apache
+            ;;
+        "nginx")
+            auto_detect_directories_nginx
+            ;;
+        "litespeed")
+            auto_detect_directories_litespeed
             ;;
         "manual")
             auto_detect_directories_manual
