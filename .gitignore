@@ -1,8 +1,16 @@
 # ===================== MOODLE BACKUP V3 - GITIGNORE =====================
 
-# Tests y desarrollo - mantener directorio limpio en producción
-tests/
-!tests/README.md
+# Tests y desarrollo - mantener archivos esenciales para CI/CD
+tests/tmp/
+tests/results/
+tests/coverage/*.txt
+tests/coverage/*.html
+!tests/
+!tests/**/*.sh
+!tests/**/*.bats
+!tests/**/*.bash
+!tests/**/README.md
+!tests/**/*.conf.example
 test-*.sh
 test-*.conf
 *.test
