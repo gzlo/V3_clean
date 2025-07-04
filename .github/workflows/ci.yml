@@ -21,6 +21,9 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y shellcheck
 
+            - name: Set script permissions
+              run: chmod +x ./scripts/lint.sh
+
             - name: Run lint checks
               run: ./scripts/lint.sh
 
