@@ -1,8 +1,7 @@
 # Asegurar que los scripts shell mantengan permisos de ejecución
 *.sh text eol=lf
-*.sh filter=lfs diff=lfs merge=lfs -text
 
-# Binarios y ejecutables
+# Binarios y ejecutables (estos sí pueden ir a LFS si son grandes)
 bin/* binary
 mb binary
 # Archivos de configuración
