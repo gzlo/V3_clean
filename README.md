@@ -49,6 +49,13 @@ moodle_cli/
 ./scripts/setup-testing.sh
 ```
 
+### 🌐 **Sistema de Auto-Detección Inteligente (NUEVO)**
+- **Detección automática** de paneles de control (cPanel, Plesk, DirectAdmin, etc.)
+- **Detección automática** de servidores web (Apache, Nginx, OpenLiteSpeed)
+- **Búsqueda inteligente** de instalaciones Moodle en rutas estándar
+- **Análisis completo** de configuraciones y versiones
+- **Selección interactiva** para múltiples instalaciones
+
 ### 🧪 **Testing Profesional**
 - **BATS framework**: Tests unitarios e integración robustos
 - **Mocks y fixtures**: Simulación completa de entornos Moodle
@@ -192,7 +199,25 @@ curl -fsSL https://raw.githubusercontent.com/gzlo/moodle-backup/main/install.sh 
 ✅ Configuración detectada automáticamente desde config.php
 ```
 
-### 3. Selección Múltiple (Si hay varias instalaciones)
+### 3. **Auto-Detección Inteligente de Sistema** ⭐ **NUEVO**
+```
+🔍 Iniciando detección automática...
+[2025-01-15 10:30:15] [INFO] Ejecutando detección: panels
+✅ Panel detectado: Apache 2.4.54 (2 sitios web encontrados)
+[2025-01-15 10:30:16] [INFO] Ejecutando detección: moodle
+✅ Instalación Moodle encontrada: /var/www/html/moodle
+✅ Instalación Moodle encontrada: /home/cliente1/public_html/learning
+
+📊 RESUMEN DE DETECCIÓN:
+🌐 Sistema detectado:
+  - Panel: Apache 2.4.54
+  - Servidor Web: Apache (2 sitios web encontrados)
+  - SO: Ubuntu 20.04 LTS
+
+🎓 Instalaciones Moodle encontradas: 2
+```
+
+### 4. Selección Múltiple (Si hay varias instalaciones)
 ```
 🎯 Instalaciones de Moodle encontradas:
   1. /home/usuario/public_html
@@ -368,22 +393,43 @@ mb logs              # Ver logs recientes de un cliente específico
 mb help              # Ayuda completa del sistema
 ```
 
-## 🖥️ Paneles Soportados
+## 🖥️ Paneles y Servidores Soportados
 
-| Panel                | Auto-detección | Multi-Cliente |  Estado  |
-| -------------------- | :------------: | :-----------: | :------: |
-| **cPanel**           |       ✅        |       ✅       | Completo |
-| **Plesk**            |       ✅        |       ✅       | Completo |
-| **DirectAdmin**      |       ✅        |       ✅       | Completo |
-| **VestaCP**          |       ✅        |       ✅       | Completo |
-| **Hestia**           |       ✅        |       ✅       | Completo |
-| **CyberPanel**       |       ✅        |       ✅       | Completo |
-| **ISPConfig**        |       ✅        |       ✅       | Completo |
-| **Docker**           |       ✅        |       ✅       | Completo |
-| **Apache Manual**    |       ✅        |       ✅       | Completo |
-| **Nginx Manual**     |       ✅        |       ✅       | Completo |
-| **LiteSpeed Manual** |       ✅        |       ✅       | Completo |
-| **Manual**           |       ✅        |       ✅       | Completo |
+### 🎛️ **Paneles de Control**
+| Panel           | Auto-detección | Multi-Cliente |  Estado  |                Detección                 |
+| --------------- | :------------: | :-----------: | :------: | :--------------------------------------: |
+| **cPanel**      |       ✅        |       ✅       | Completo |     `/usr/local/cpanel/bin/whmapi1`      |
+| **Plesk**       |       ✅        |       ✅       | Completo |           `/opt/psa/bin/admin`           |
+| **DirectAdmin** |       ✅        |       ✅       | Completo |   `/usr/local/directadmin/custombuild`   |
+| **ISPConfig**   |       ✅        |       ✅       | Completo | `/usr/local/ispconfig/server/server.php` |
+| **Webmin**      |       ✅        |       ✅       | Completo |           `/etc/webmin/config`           |
+| **VestaCP**     |       ✅        |       ✅       | Completo |   `/usr/local/vesta/bin/v-list-users`    |
+| **HestiaCP**    |       ✅        |       ✅       | Completo |   `/usr/local/hestia/bin/v-list-users`   |
+| **CyberPanel**  |       ✅        |       ✅       | Completo |      `/usr/local/CyberCP/manage.py`      |
+| **aaPanel**     |       ✅        |       ✅       | Completo |       `/www/server/panel/BT-Panel`       |
+
+### 🌐 **Servidores Web** ⭐ **NUEVO**
+| Servidor          | Auto-detección | Manual Config |  Estado  |           Detección            |
+| ----------------- | :------------: | :-----------: | :------: | :----------------------------: |
+| **Apache**        |       ✅        |       ✅       | ✨ Nuevo  | `/etc/httpd/`, `/etc/apache2/` |
+| **Nginx**         |       ✅        |       ✅       | ✨ Nuevo  |         `/etc/nginx/`          |
+| **OpenLiteSpeed** |       ✅        |       ✅       | ✨ Nuevo  |       `/usr/local/lsws/`       |
+| **Manual**        |       ✅        |       ✅       | Completo |  Configuración personalizada   |
+
+### 🔍 **Sistema de Auto-Detección Inteligente**
+- **Prioridad 1**: Paneles de control (cPanel, Plesk, etc.)
+- **Prioridad 2**: Servidores web independientes (Apache, Nginx, OLS)
+- **Prioridad 3**: Instalaciones Moodle en rutas estándar
+- **Prioridad 4**: Bases de datos y configuraciones
+
+**📋 Rutas de Búsqueda Moodle (independientes del panel):**
+- `/var/www`, `/var/www/html` (Apache/Nginx estándar)
+- `/home/*/public_html` (usuarios cPanel/DirectAdmin)
+- `/usr/local/apache/htdocs` (cPanel/WHM)
+- `/opt/bitnami/apache2/htdocs` (Bitnami)
+- `/srv/www` (SUSE/openSUSE)
+- `/www` (OpenLiteSpeed)
+- Directorio actual
 
 ## � Estructura de Archivos
 
