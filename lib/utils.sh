@@ -103,7 +103,16 @@ is_number_in_range() {
     [[ "$number" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || return 1
     
     # Verificar rango usando aritmética de punto flotante
-    (( $(echo "$number >= $min && $number <= $max" | bc -l 2>/dev/null || echo 0) ))
+    if [[ "$BC_AVAILABLE" == "true" ]]; then
+        (( $(echo "$number >= $min && $number <= $max" | bc -l 2>/dev/null || echo 0) ))
+    else
+        # Fallback para números enteros sin bc
+        local int_number int_min int_max
+        int_number=$(echo "$number" | cut -d. -f1)
+        int_min=$(echo "$min" | cut -d. -f1)
+        int_max=$(echo "$max" | cut -d. -f1)
+        (( int_number >= int_min && int_number <= int_max ))
+    fi
 }
 
 ##
@@ -159,13 +168,21 @@ format_bytes() {
         return 1
     }
     
-    # Convertir a número decimal
+    # Convertir usando bc si está disponible, sino usar aritmética entera
     local size=$bytes
     
-    while (( $(echo "$size >= 1024" | bc -l 2>/dev/null || echo 0) )) && [[ $unit -lt $((${#units[@]} - 1)) ]]; do
-        size=$(echo "scale=1; $size / 1024" | bc -l 2>/dev/null || echo "$size")
-        ((unit++))
-    done
+    if [[ "$BC_AVAILABLE" == "true" ]]; then
+        while (( $(echo "$size >= 1024" | bc -l 2>/dev/null || echo 0) )) && [[ $unit -lt $((${#units[@]} - 1)) ]]; do
+            size=$(echo "scale=1; $size / 1024" | bc -l 2>/dev/null || echo "$size")
+            ((unit++))
+        done
+    else
+        # Fallback sin bc para números enteros
+        while (( size >= 1024 )) && [[ $unit -lt $((${#units[@]} - 1)) ]]; do
+            size=$((size / 1024))
+            ((unit++))
+        done
+    fi
     
     # Formatear resultado
     if [[ $unit -eq 0 ]]; then
@@ -658,9 +675,16 @@ backup_file() {
 # ===================== INICIALIZACIÓN =====================
 
 # Verificar dependencias críticas
-for cmd in date tr sed awk bc; do
+for cmd in date tr sed awk; do
     if ! command_exists "$cmd"; then
         echo "ERROR: Comando requerido no encontrado: $cmd" >&2
         exit "$EXIT_DEPENDENCY_ERROR"
     fi
 done
+
+# Verificar dependencias opcionales
+if ! command_exists "bc"; then
+    readonly BC_AVAILABLE=false
+else
+    readonly BC_AVAILABLE=true
+fi

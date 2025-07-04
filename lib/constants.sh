@@ -16,7 +16,7 @@ export MOODLE_BACKUP_CONSTANTS_LOADED="true"
 
 # Información de versión
 readonly MOODLE_BACKUP_VERSION="3.5.0"
-readonly MOODLE_BACKUP_NAME="Moodle Backup CLI"
+readonly MOODLE_BACKUP_NAME="Moodle CLI Backup"
 readonly MOODLE_BACKUP_AUTHOR="GZLOnline"
 
 # Aliases para compatibilidad
@@ -43,6 +43,11 @@ readonly MOODLE_BACKUP_DEFAULT_TMP_DIR="/tmp"
 readonly MOODLE_BACKUP_DEFAULT_LOG_DIR="/var/log/moodle-backup"
 readonly MOODLE_BACKUP_DEFAULT_CONFIG_SYSTEM="/etc/moodle-backup"
 readonly MOODLE_BACKUP_DEFAULT_CONFIG_USER="$HOME/.config/moodle-backup"
+
+# Aliases para compatibilidad con tests
+readonly DEFAULT_BACKUP_DIR="$HOME/backups"
+readonly DEFAULT_LOG_DIR="$MOODLE_BACKUP_DEFAULT_LOG_DIR"
+readonly DEFAULT_CONFIG_DIR="$MOODLE_BACKUP_DEFAULT_CONFIG_USER"
 
 # ===================== CONFIGURACIÓN DE LOGGING =====================
 
@@ -94,7 +99,15 @@ readonly DEFAULT_COMPRESSION_ALGORITHM="zstd"
 readonly DEFAULT_COMPRESSION_LEVEL=3
 
 # Extensiones de archivo
-readonly COMPRESSION_EXTENSIONS=(
+if [[ "${MOODLE_CLI_TEST_MODE:-}" == "true" ]]; then
+    # En modo test, permitir redeclaración de arrays globales
+    declare -gA COMPRESSION_EXTENSIONS 2>/dev/null || true
+else
+    # En modo normal, usar declaración estándar
+    declare -A COMPRESSION_EXTENSIONS
+fi
+
+COMPRESSION_EXTENSIONS=(
     ["gzip"]=".gz"
     ["zstd"]=".zst" 
     ["xz"]=".xz"
@@ -171,26 +184,47 @@ readonly TEMP_FILE_EXTENSIONS=("tmp" "temp" "cache" "lock" "pid" "swp" "swo" "or
 
 # ===================== CÓDIGOS DE SALIDA =====================
 
-# Códigos de exit estándar
+# Códigos de salida estándar
 readonly EXIT_SUCCESS=0
-readonly EXIT_GENERAL_ERROR=1
-readonly EXIT_MISUSE=2
-readonly EXIT_CANNOT_EXECUTE=126
-readonly EXIT_COMMAND_NOT_FOUND=127
-readonly EXIT_INVALID_EXIT_ARGUMENT=128
-readonly EXIT_FATAL_ERROR_SIGNAL=130
-
-# Códigos específicos del sistema
+readonly EXIT_ERROR=1
+readonly EXIT_INVALID_ARGUMENT=2
+readonly EXIT_MISSING_DEPENDENCY=3
+readonly EXIT_PERMISSION_DENIED=4
+readonly EXIT_FILE_NOT_FOUND=5
+readonly EXIT_NETWORK_ERROR=6
+readonly EXIT_TIMEOUT=7
+readonly EXIT_INTERRUPTED=8
+readonly EXIT_DEPENDENCY_ERROR=9
 readonly EXIT_CONFIG_ERROR=10
-readonly EXIT_DEPENDENCY_ERROR=11
+
+# Códigos específicos del sistema (continuación)
 readonly EXIT_VALIDATION_ERROR=12
 readonly EXIT_PERMISSION_ERROR=13
-readonly EXIT_NETWORK_ERROR=14
 readonly EXIT_DISK_SPACE_ERROR=15
 readonly EXIT_DATABASE_ERROR=16
 readonly EXIT_COMPRESSION_ERROR=17
 readonly EXIT_UPLOAD_ERROR=18
 readonly EXIT_MOODLE_ERROR=19
+
+# Aliases adicionales para códigos de exit
+readonly EXIT_INVALID_ARGS=2  # Alias para EXIT_INVALID_ARGUMENT
+readonly EXIT_MISSING_DEPS=3  # Alias para EXIT_MISSING_DEPENDENCY
+
+# ===================== TIPOS DE BACKUP =====================
+
+# Tipos de backup soportados
+readonly BACKUP_TYPE_FULL="full"
+readonly BACKUP_TYPE_DATABASE="database"
+readonly BACKUP_TYPE_FILES="files"
+readonly BACKUP_TYPE_CONFIG="config"
+
+# ===================== NIVELES DE COMPRESIÓN =====================
+
+# Niveles de compresión (0 = sin compresión, 9 = máxima)
+readonly COMPRESSION_NONE=0
+readonly COMPRESSION_FAST=1
+readonly COMPRESSION_BALANCED=5
+readonly COMPRESSION_BEST=9
 
 # ===================== EXPRESIONES REGULARES =====================
 
@@ -322,3 +356,11 @@ export MOODLE_BACKUP_VERSION
 export MOODLE_BACKUP_ROOT_DIR
 export MOODLE_BACKUP_SRC_DIR
 export MOODLE_BACKUP_LIB_DIR
+export MOODLE_BACKUP_CONFIG_DIR
+export MOODLE_BACKUP_SCRIPTS_DIR
+export MOODLE_BACKUP_DEFAULT_TMP_DIR
+export MOODLE_BACKUP_DEFAULT_LOG_DIR
+export MOODLE_BACKUP_DEFAULT_CONFIG_SYSTEM
+export MOODLE_BACKUP_DEFAULT_CONFIG_USER
+export PROJECT_NAME
+export VERSION

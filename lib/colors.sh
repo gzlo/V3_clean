@@ -171,35 +171,35 @@ fi
 # ===================== SÍMBOLOS Y CARACTERES ESPECIALES =====================
 
 if [[ "$UNICODE_ENABLED" == "true" ]]; then
-    # Símbolos Unicode
-    readonly SYMBOL_SUCCESS="✓"
-    readonly SYMBOL_ERROR="✗"
-    readonly SYMBOL_WARNING="⚠"
-    readonly SYMBOL_INFO="ℹ"
-    readonly SYMBOL_QUESTION="?"
-    readonly SYMBOL_ARROW="➤"
-    readonly SYMBOL_BULLET="•"
-    readonly SYMBOL_CHECKBOX_CHECKED="☑"
-    readonly SYMBOL_CHECKBOX_UNCHECKED="☐"
-    readonly SYMBOL_CIRCLE="●"
-    readonly SYMBOL_SQUARE="■"
-    readonly SYMBOL_DIAMOND="♦"
-    readonly SYMBOL_STAR="★"
-    readonly SYMBOL_HEART="♥"
-    readonly SYMBOL_CLOCK="⏰"
-    readonly SYMBOL_GEAR="⚙"
-    readonly SYMBOL_ROCKET="🚀"
-    readonly SYMBOL_BACKUP="💾"
-    readonly SYMBOL_CLOUD="☁"
-    readonly SYMBOL_DATABASE="🗄"
-    readonly SYMBOL_FOLDER="📁"
-    readonly SYMBOL_FILE="📄"
-    readonly SYMBOL_LOCK="🔒"
-    readonly SYMBOL_KEY="🔑"
-    readonly SYMBOL_SHIELD="🛡"
-    readonly SYMBOL_PROGRESS_FULL="█"
-    readonly SYMBOL_PROGRESS_EMPTY="░"
-    readonly SYMBOL_PROGRESS_PARTIAL="▓"
+    # Símbolos Unicode (solo definir si no existen)
+    if [[ -z "${SYMBOL_SUCCESS:-}" ]]; then readonly SYMBOL_SUCCESS="✓"; fi
+    if [[ -z "${SYMBOL_ERROR:-}" ]]; then readonly SYMBOL_ERROR="✗"; fi
+    if [[ -z "${SYMBOL_WARNING:-}" ]]; then readonly SYMBOL_WARNING="⚠"; fi
+    if [[ -z "${SYMBOL_INFO:-}" ]]; then readonly SYMBOL_INFO="ℹ"; fi
+    if [[ -z "${SYMBOL_QUESTION:-}" ]]; then readonly SYMBOL_QUESTION="?"; fi
+    if [[ -z "${SYMBOL_ARROW:-}" ]]; then readonly SYMBOL_ARROW="➤"; fi
+    if [[ -z "${SYMBOL_BULLET:-}" ]]; then readonly SYMBOL_BULLET="•"; fi
+    if [[ -z "${SYMBOL_CHECKBOX_CHECKED:-}" ]]; then readonly SYMBOL_CHECKBOX_CHECKED="☑"; fi
+    if [[ -z "${SYMBOL_CHECKBOX_UNCHECKED:-}" ]]; then readonly SYMBOL_CHECKBOX_UNCHECKED="☐"; fi
+    if [[ -z "${SYMBOL_CIRCLE:-}" ]]; then readonly SYMBOL_CIRCLE="●"; fi
+    if [[ -z "${SYMBOL_SQUARE:-}" ]]; then readonly SYMBOL_SQUARE="■"; fi
+    if [[ -z "${SYMBOL_DIAMOND:-}" ]]; then readonly SYMBOL_DIAMOND="♦"; fi
+    if [[ -z "${SYMBOL_STAR:-}" ]]; then readonly SYMBOL_STAR="★"; fi
+    if [[ -z "${SYMBOL_HEART:-}" ]]; then readonly SYMBOL_HEART="♥"; fi
+    if [[ -z "${SYMBOL_CLOCK:-}" ]]; then readonly SYMBOL_CLOCK="⏰"; fi
+    if [[ -z "${SYMBOL_GEAR:-}" ]]; then readonly SYMBOL_GEAR="⚙"; fi
+    if [[ -z "${SYMBOL_ROCKET:-}" ]]; then readonly SYMBOL_ROCKET="🚀"; fi
+    if [[ -z "${SYMBOL_BACKUP:-}" ]]; then readonly SYMBOL_BACKUP="💾"; fi
+    if [[ -z "${SYMBOL_CLOUD:-}" ]]; then readonly SYMBOL_CLOUD="☁"; fi
+    if [[ -z "${SYMBOL_DATABASE:-}" ]]; then readonly SYMBOL_DATABASE="🗄"; fi
+    if [[ -z "${SYMBOL_FOLDER:-}" ]]; then readonly SYMBOL_FOLDER="📁"; fi
+    if [[ -z "${SYMBOL_FILE:-}" ]]; then readonly SYMBOL_FILE="📄"; fi
+    if [[ -z "${SYMBOL_LOCK:-}" ]]; then readonly SYMBOL_LOCK="🔒"; fi
+    if [[ -z "${SYMBOL_KEY:-}" ]]; then readonly SYMBOL_KEY="🔑"; fi
+    if [[ -z "${SYMBOL_SHIELD:-}" ]]; then readonly SYMBOL_SHIELD="🛡"; fi
+    if [[ -z "${SYMBOL_PROGRESS_FULL:-}" ]]; then readonly SYMBOL_PROGRESS_FULL="█"; fi
+    if [[ -z "${SYMBOL_PROGRESS_EMPTY:-}" ]]; then readonly SYMBOL_PROGRESS_EMPTY="░"; fi
+    if [[ -z "${SYMBOL_PROGRESS_PARTIAL:-}" ]]; then readonly SYMBOL_PROGRESS_PARTIAL="▓"; fi
     
     # Spinner frames para animaciones
     readonly SPINNER_FRAMES=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
@@ -569,6 +569,19 @@ clear_line() {
 
 # Detectar ancho del terminal
 readonly TERMINAL_WIDTH=$(get_terminal_width)
+
+# ===================== ALIAS DE COMPATIBILIDAD =====================
+# Para retrocompatibilidad con logging.sh y otros módulos
+
+# Alias de colores básicos
+readonly RED="$COLOR_RED"
+readonly GREEN="$COLOR_GREEN"
+readonly YELLOW="$COLOR_YELLOW"
+readonly BLUE="$COLOR_BLUE"
+readonly CYAN="$COLOR_CYAN"
+readonly MAGENTA="$COLOR_PURPLE"
+readonly WHITE="$COLOR_WHITE"
+readonly NC="$COLOR_RESET"
 
 # Exportar variables críticas para subprocesos
 export COLOR_ENABLED
