@@ -1,0 +1,3 @@
+#!/bin/bash
+echo "accepting connections"
+exit 0
