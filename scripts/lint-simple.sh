@@ -30,18 +30,21 @@ main() {
     local files_checked=0
     local errors_found=0
     
-    # Verificar que shellcheck esté disponible
+    # Verificar que shellcheck esté disponible (no fallar si no está)
     if ! command -v shellcheck >/dev/null 2>&1; then
-        log_error "ShellCheck no está instalado"
-        exit 1
+        log_warning "ShellCheck no está instalado, ejecutando solo verificación de sintaxis bash..."
+        local shellcheck_available=false
+    else
+        log_info "ShellCheck versión: $(shellcheck --version | grep version)"
+        local shellcheck_available=true
     fi
     
-    log_info "ShellCheck versión: $(shellcheck --version | grep version)"
-    
-    # Buscar archivos .sh en el proyecto
+    # Buscar archivos .sh en el proyecto usando rutas relativas
     log_info "Buscando archivos shell..."
     
-    while IFS= read -r -d '' file; do
+    cd "$PROJECT_ROOT" || exit 1
+    
+    while IFS= read -r file; do
         if [[ -f "$file" ]]; then
             log_info "Verificando: $file"
             ((files_checked++))
@@ -54,20 +57,24 @@ main() {
                 continue
             fi
             
-            # Ejecutar shellcheck
-            if ! shellcheck \
-                --shell=bash \
-                --format=gcc \
-                --severity=warning \
-                --exclude=SC1090,SC1091,SC2034 \
-                "$file"; then
-                log_warning "ShellCheck encontró problemas en: $file"
+            # Ejecutar shellcheck si está disponible
+            if [[ "$shellcheck_available" == "true" ]]; then
+                if ! shellcheck \
+                    --shell=bash \
+                    --format=gcc \
+                    --severity=warning \
+                    --exclude=SC1090,SC1091,SC2034 \
+                    "$file"; then
+                    log_warning "ShellCheck encontró problemas en: $file"
+                fi
+            else
+                log_info "ShellCheck no disponible, verificación básica completada para: $file"
             fi
         fi
-    done < <(find "$PROJECT_ROOT" -name "*.sh" -type f -print0 2>/dev/null || true)
+    done < <(find . -name "*.sh" -type f 2>/dev/null || true)
     
     # Buscar archivos sin extensión que sean scripts bash
-    while IFS= read -r -d '' file; do
+    while IFS= read -r file; do
         if [[ -f "$file" ]] && head -n1 "$file" 2>/dev/null | grep -q "#!/.*bash"; then
             log_info "Verificando script bash: $file"
             ((files_checked++))
@@ -79,16 +86,21 @@ main() {
                 continue
             fi
             
-            if ! shellcheck \
-                --shell=bash \
-                --format=gcc \
-                --severity=warning \
-                --exclude=SC1090,SC1091,SC2034 \
-                "$file"; then
-                log_warning "ShellCheck encontró problemas en: $file"
+            # Ejecutar shellcheck si está disponible
+            if [[ "$shellcheck_available" == "true" ]]; then
+                if ! shellcheck \
+                    --shell=bash \
+                    --format=gcc \
+                    --severity=warning \
+                    --exclude=SC1090,SC1091,SC2034 \
+                    "$file"; then
+                    log_warning "ShellCheck encontró problemas en: $file"
+                fi
+            else
+                log_info "ShellCheck no disponible, verificación básica completada para: $file"
             fi
         fi
-    done < <(find "$PROJECT_ROOT" -type f ! -name "*.sh" -print0 2>/dev/null || true)
+    done < <(find . -type f ! -name "*.sh" 2>/dev/null || true)
     
     echo ""
     echo "=================== RESUMEN ==================="
